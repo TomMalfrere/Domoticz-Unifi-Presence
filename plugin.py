@@ -58,18 +58,28 @@
     </params>
 </plugin>
 """
-import Domoticz
-import socket
-import json
-import re
+try:
+    import Domoticz
+except ImportError:
+    # these are import emulating the Domoticz package
+    from tests import fakeDomoticz as Domoticz
+    from tests.fakeDomoticz import Parameters
+    # from blz.fakeDomoticz import Devices
+    # from blz.fakeDomoticz import Images
+
+# import socket
+# import json
+# import re
 import requests
-import urllib
-import time
-import os
-import urllib3
+# import urllib
+# import time
+# import os
+# import urllib3
+
 from requests import Session
 from typing import Pattern, Dict, Union
 from datetime import datetime
+
 # https://ubntwiki.com/products/software/unifi-controller/api
 
 
@@ -948,10 +958,10 @@ class BasePlugin:
         if value is True:
             if self.versionCheck is not False:
                 self.versionCheck = True
-                Domoticz.Log(strName+"Plugin allowed to start (triggered by: "+note+")")
+                Domoticz.Log(f"{strName} Plugin allowed to start (triggered by: {note})")
         elif value is False:
             self.versionCheck = False
-            Domoticz.Error(strName+"Plugin NOT allowed to start (triggered by: "+note+")")
+            Domoticz.Error(f"{strName} Plugin NOT allowed to start (triggered by: {note})")
 
     def detectUnifiDevices(self):
         strName = "detect Unifi Devices: "
