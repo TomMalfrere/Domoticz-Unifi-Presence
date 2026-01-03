@@ -445,14 +445,14 @@ class BasePlugin:
         return ';'.join(found)
 
     def login(self):
-        strName = "login: "
-        Domoticz.Debug(strName+"called")
         """
         Log the user in
         :return: None
         api url for dreammachine pro: /api/auth/login
         api url for other: /api/login
         """
+        strName = "login: "
+        Domoticz.Debug(strName+"called")
         self._login_data['username'] = Parameters["Username"]
         self._login_data['password'] = Parameters["Password"]
         self._login_data['remember'] = True
