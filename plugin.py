@@ -507,11 +507,11 @@ class BasePlugin:
             Domoticz.Error("Login failed. If it's first attempt then ok, otherwise there is something wrong: " + str(e))
 
     def logout(self):
-        strName = "logout: "
         """
         Log the user out
         :return: None
         """
+        strName = "logout: "
         try:
             if self._current_status_code == 200:
                 if Parameters["Mode4"] == "unificontroller":
