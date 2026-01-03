@@ -439,6 +439,7 @@ class BasePlugin:
                 self.request_online_phones()
 
 
+    @staticmethod
     def getCookies(cookie_jar, domain):
         cookie_dict = cookie_jar.get_dict(domain=domain)
         found = ['%s=%s' % (name, value) for (name, value) in cookie_dict.items()]
@@ -627,8 +628,9 @@ class BasePlugin:
                 Domoticz.Log(strName+"Phone Naam = "+str(self.Matrix[n][0])+" | "+str(self.Matrix[n][1])+" | "+str(self.Matrix[n][2])+" | "+str(self.Matrix[n][3])+" | "+str(self.Matrix[n][4])+" | "+str(self.Matrix[n][5]))
 
 
+    @staticmethod
     def get_attribute(data, attribute, default_value):
-        return data.get(attribute) or default_value
+        return data.get(attribute, default_value)
 
     def request_details(self):
         strName = "request_details: "
