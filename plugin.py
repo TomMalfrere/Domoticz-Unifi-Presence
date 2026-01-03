@@ -820,11 +820,9 @@ class BasePlugin:
                 Domoticz.Log(strName+"Invalid login, or login has expired")
                 self.login()
         except requests.exceptions.ReadTimeout:
-            r.status.code = "Read Timeout"
             Domoticz.Error("Request to " +Parameters["Mode4"]+" timed out.")
         except requests.exceptions.ConnectionError:
-            r.status_code = "Connection refused"
-            Domoticz.Error(r.status.code+" to "+Paramters["Mode4"])
+            Domoticz.Error("Connection refused to "+Parameters["Mode4"])
             self.login()
 
 
