@@ -498,14 +498,13 @@ class BasePlugin:
                     self._lastloginfailed = True
                     self._current_status_code = 999
         except requests.exceptions.ReadTimeout:
-            r.status.code = "Read Timeout"
             Domoticz.Error("Request to " +Parameters["Mode4"]+" timed out.")
+            self._current_status_code = 999
         except requests.exceptions.ConnectionError:
-            r.status_code = "Connection refused"
-            Domoticz.Error(r.status.code+" to "+Paramters["Mode4"])
-            self.login()
-        except:
-            Domoticz.Error("Login failed. If it's first attemp then oke, otherwise there is something wrong")
+            Domoticz.Error("Connection refused to "+Parameters["Mode4"])
+            self._current_status_code = 999
+        except Exception as e:
+            Domoticz.Error("Login failed. If it's first attempt then ok, otherwise there is something wrong: " + str(e))
 
     def logout(self):
         strName = "logout: "
@@ -527,13 +526,11 @@ class BasePlugin:
                 self._current_status_code = 999
                 self._timeout_timer = None
         except requests.exceptions.ReadTimeout:
-            r.status.code = "Read Timeout"
-            Domoticz.Error("Request to " +Parameters["Mode4"]+" timed out.")
+            Domoticz.Error("Request to " +Parameters["Mode4"]+" timed out during logout.")
         except requests.exceptions.ConnectionError:
-            r.status_code = "Connection refused"
-            Domoticz.Error(r.status.code+" to "+Paramters["Mode4"])
-        except:
-            Domoticz.Error("Logout failure")
+            Domoticz.Error("Connection refused to "+Parameters["Mode4"]+" during logout.")
+        except Exception as e:
+            Domoticz.Error("Logout failure: " + str(e))
 
     def InitAfterLogin(self):
         if self._current_status_code == 200:
