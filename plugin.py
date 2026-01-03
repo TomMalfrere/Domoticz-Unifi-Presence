@@ -569,7 +569,6 @@ class BasePlugin:
                 else:
                     Domoticz.Error(strName+"Not a valid mac address '"+Device_Mac+"'")
                 self.Matrix[count][1] = Device_Mac
-                Device_Unit = None
                 self.Matrix[count][3] = "Off"
                 self.Matrix[count][4] = "No"
                 self.Matrix[count][5] = "No"
@@ -577,7 +576,6 @@ class BasePlugin:
                 found_user = Device_Name
                 for dv in Devices:
                     # Find the unit number
-                    search_phone = Devices[dv].Name
                     position = len(self._plugin_name)+3
                     if Devices[dv].Name[position:] == found_user:
                         self.Matrix[count][2] = Devices[dv].Unit
@@ -586,7 +584,6 @@ class BasePlugin:
                 if Parameters["Mode3"] == "Yes":
                     self.Matrix[count][0] = "Geo "+Device_Name
                     self.Matrix[count][1] = "11:11:11:11:11:11"
-                    Device_Unit = None
                     self.Matrix[count][3] = "Off"
                     self.Matrix[count][4] = "No"
                     self.Matrix[count][5] = "GEO"
@@ -594,7 +591,6 @@ class BasePlugin:
                     found_user = "Geo "+Device_Name
                     for dv in Devices:
                         # Find the unit number
-                        devName = Devices[dv].Name
                         position = len(self._plugin_name)+3
                         if Devices[dv].Name[position:] == found_user:
                             self.Matrix[count][2] = Devices[dv].Unit
@@ -776,11 +772,7 @@ class BasePlugin:
                 for item in data:
                     Domoticz.Debug(strName+"Json Data (device) = " + str(item))
                     device_mac=Parameters["Mode2"].split(",")
-                    found_mac = 0
-                    found_mac_address = None
-                    found_user = None
                     for device in device_mac:
-                        device_unit = None
                         device = device.strip()
                         phone_name, mac_id = device.split("=")
                         phone_name = phone_name.strip()
@@ -952,7 +944,6 @@ class BasePlugin:
 
             if self._current_status_code == 200:
                 data = r.json()['data']
-                totalUnifiDevices = 0
                 for item in data:
                     Domoticz.Debug(strName+"Json Data (device) = " + str(item))
                     deviceCode = item['model']
