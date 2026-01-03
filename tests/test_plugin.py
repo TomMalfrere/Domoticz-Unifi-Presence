@@ -29,6 +29,10 @@ class TestPlugin(TestCase):
         """Dummy test."""
         always_right = True
         self.assertTrue(always_right)
+        
+    def test_init(self):
+        """Test plugin initialization."""
+        self.assertIsInstance(self.plugin, BasePlugin)
 
 
 class TestRequestOnlinePhones(TestCase):
