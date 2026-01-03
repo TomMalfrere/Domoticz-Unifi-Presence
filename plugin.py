@@ -533,6 +533,7 @@ class BasePlugin:
             Domoticz.Error("Logout failure: " + str(e))
 
     def InitAfterLogin(self):
+        strName = "InitAfterLogin: "
         if self._current_status_code == 200:
             self.detectUnifiDevices()
             self.create_devices()
@@ -699,6 +700,7 @@ class BasePlugin:
                                     devName = devName.strip()
                                     devUnit = int(devUnit)
                                     device_found = 0
+                                    found_u_name_total = ""
                                     found_devUnit = 0
                                     if devName == self.u_name_total:
                                         #Found device
