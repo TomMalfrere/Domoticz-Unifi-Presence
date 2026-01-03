@@ -68,13 +68,13 @@ except ImportError:
     # from blz.fakeDomoticz import Images
 
 # import socket
-# import json
-# import re
+import json
+import re
 import requests
-# import urllib
-# import time
-# import os
-# import urllib3
+import urllib
+import time
+import os
+import urllib3
 
 from requests import Session
 from typing import Pattern, Dict, Union
