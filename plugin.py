@@ -64,8 +64,8 @@ except ImportError:
     # these are import emulating the Domoticz package
     from tests import fakeDomoticz as Domoticz
     from tests.fakeDomoticz import Parameters
-    # from blz.fakeDomoticz import Devices
-    # from blz.fakeDomoticz import Images
+    from tests.fakeDomoticz import Devices
+    from tests.fakeDomoticz import Images
 
 # import socket
 import json
@@ -84,43 +84,14 @@ from datetime import datetime
 
 
 class BasePlugin:
-    _Off_Delay = 60
-    _plugin_name = False
-    _device_table = False
-    _unifiConn = False
-    override_time = 0
-    hostAuth = False
     UNIFI_ANYONE_HOME_UNIT = 1
     UNIFI_OFF_DELAY = 2
     UNIFI_UPDATE_LOG = 3
     UNIFI_OVERRIDE_UNIT = 255
-    _Cookies = None
-    _csrftoken = None
-    cookie = None
-    cookieAvailable = False
-    phone_name = ""
-    Matrix = ""
+
     count_g_device = 0
-    _devices_found = {}
-    _login_data = {}
-    _current_status_code = None
-    versionCheck = None
-    _block_data = {}
-    _block_data['cmd'] = None
-    _block_data['mac'] = None
-    _login_data['username'] = None
-    _login_data['password'] = None
-    _site = None
-    _verify_ssl = False
-    _baseurl = None
-    _session = requests.Session()
-    _uapDevices = []
-    _total_phones_active_before = 0
-    _lastloginfailed = False
-    u_name_total_found = ""
-    u_name_total = ""
     devUnit_found = 0
-    _log_devices = False
+
     UnifiDevicesNames = {
         #Device Code, Device Type, Device Name
         "BZ2":       ("uap",       "UniFi AP"),
@@ -204,26 +175,38 @@ class BasePlugin:
         "UDM":       ("udm",       "Unifi Dream Machine"),
         "UXG":       ("uxg",       "UXG",)
         }
-    uap = []
-    usw = []
-    ugw = []
-    uph = []
-    udm = []
 
     def __init__(self):
-        return
+        self._Off_Delay = 60
+        self._plugin_name = False
+        self._device_table = False
+        self.override_time = 0
+        self._Cookies = None
+        self.phone_name = ""
+        self.Matrix = ""
+        self._login_data = {"username": None, 
+                            "password": None}
+        self._current_status_code = None
+        self.versionCheck = None
+        self._block_data = {"cmd": None,
+                            "mac": None}
+        self._site = None
+        self._verify_ssl = False
+        self._baseurl = None
+        self._session = requests.Session()
+        self._total_phones_active_before = 0
+        self._lastloginfailed = False
+        self.u_name_total = ""
+        self._log_devices = False
+        self.uap = []
+        self.usw = []
+        self.ugw = []
+        self.uph = []
+        self.udm = []
 
     def onStart(self):
         strName = "onStart: "
         Domoticz.Debug(strName+"called")
-
-        #self._login_data['username'] = Parameters["Username"]
-        #self._login_data['password'] = Parameters["Password"]
-        #self._login_data['remember'] = True
-        #self._site = Parameters["Mode1"]
-        #self._verify_ssl = False
-        #self._baseurl = 'https://'+Parameters["Address"]+':'+Parameters["Port"]
-        #self._session = Session()
 
         if (Parameters["Mode6"] != "0"):
             Domoticz.Debugging(int(Parameters["Mode6"]))
@@ -456,7 +439,6 @@ class BasePlugin:
         Domoticz.Debug(strName+"called")
         self._login_data['username'] = Parameters["Username"]
         self._login_data['password'] = Parameters["Password"]
-        self._login_data['remember'] = True
         self._site = Parameters["Mode1"]
         self._verify_ssl = False
         self._baseurl = "https://"+Parameters["Address"]+":"+Parameters["Port"]
@@ -689,7 +671,6 @@ class BasePlugin:
                     for item in data:
                         if item['type'] == j_json[0]:
                             device_found = 0
-                            u_name_total_found = ""
                             self.u_name_total = ""
                             if 'name' not in item:
                                 u_name = item['model']
@@ -702,13 +683,9 @@ class BasePlugin:
                                     devName = devName.strip()
                                     devUnit = int(devUnit)
                                     device_found = 0
-                                    found_u_name_total = ""
-                                    found_devUnit = 0
                                     if devName == self.u_name_total:
                                         #Found device
                                         device_found = 1
-                                        found_u_name_total = self.u_name_total
-                                        found_devUnit = devUnit
                                         break
                             else:
                                 devName = ""
@@ -746,11 +723,11 @@ class BasePlugin:
                             except:
                                 pass
         except requests.exceptions.ReadTimeout:
-            r.status.code = "Read Timeout"
+            r.status_code = "Read Timeout"
             Domoticz.Error("Request to " +Parameters["Mode4"]+" timed out.")
         except requests.exceptions.ConnectionError:
             r.status_code = "Connection refused"
-            Domoticz.Error(r.status.code+" to "+Paramters["Mode4"])
+            Domoticz.Error(r.status_code+" to "+Parameters["Mode4"])
             self.login()
 
     def is_non_zero_file(self, fpath):  
