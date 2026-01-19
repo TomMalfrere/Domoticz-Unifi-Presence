@@ -926,13 +926,13 @@ class BasePlugin:
             UpdateDevice(self.UNIFI_ANYONE_HOME_UNIT, 0, "Off")
 
 
-    def setVersionCheck(self, value, note):
+    def setVersionCheck(self, value: bool, note: str):
         strName = "setVersionCheck - "
-        if value is True:
+        if value:
             if self.versionCheck is not False:
                 self.versionCheck = True
                 Domoticz.Log(f"{strName} Plugin allowed to start (triggered by: {note})")
-        elif value is False:
+        else:
             self.versionCheck = False
             Domoticz.Error(f"{strName} Plugin NOT allowed to start (triggered by: {note})")
 
