@@ -274,7 +274,7 @@ class BasePlugin:
 
     def onStop(self):
         strName = "onStop: "
-        Domoticz.Debug(strName+"Pluggin is stopping.")
+        Domoticz.Debug(strName+"Plugin is stopping.")
         self.logout()
 
     def onConnect(self, Connection, Status, Description):
