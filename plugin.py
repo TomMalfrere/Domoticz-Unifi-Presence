@@ -290,9 +290,8 @@ class BasePlugin:
         DumpHTTPResponseToLog(Data)
         Domoticz.Debug(f"{strName}Data = {Data}")
         strData = Data["Data"].decode("utf-8", "ignore")
-        status = int(Data["Status"])
 
-        if (self._current_status_code == 200 or self._current_status_code == 404):
+        if (self._current_status_code in [200, 404]):
             unifiResponse = json.loads(strData)
             Domoticz.Debug(f"{strName}Retrieved following json: {json.dumps(unifiResponse)}")
             self.onHeartbeat()
