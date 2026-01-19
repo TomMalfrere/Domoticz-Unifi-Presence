@@ -230,13 +230,14 @@ class BasePlugin:
         if not self.versionCheck:
             return
 
-        # Create file
+        # Create file (use context managers to avoid leaving file handles open)
         try:
-           f = open(Parameters["HomeFolder"] + "devicetable.txt")
-           Domoticz.Log(strName+"Found devicestable.txt file")
+            with open(Parameters["HomeFolder"] + "devicetable.txt", "r") as f:
+                Domoticz.Log(f"{strName} Found devicestable.txt file")
         except:
-           Domoticz.Log(strName+"Didn't found devicestable.txt file, creating file")
-           f = open(Parameters["HomeFolder"] + "devicetable.txt", "w+")
+            Domoticz.Log(f"{strName} Didn't found devicestable.txt file, creating file")
+            with open(Parameters["HomeFolder"] + "devicetable.txt", "w+") as f:
+                pass
 
         # load custom images
         if "UnifiPresenceAnyone" not in Images:
@@ -752,9 +753,12 @@ class BasePlugin:
             Domoticz.Device(Name=un_name, Unit=new_unit, Used=1, Type=243, Subtype=int(un_typename), Options=un_custom).Create()
         UpdateDevice(new_unit, 0, "0")
         self.create_devicetable(new_unit, un_name)
-        #reload the devicetable.txt file
-        f = open(Parameters["HomeFolder"] + "devicetable.txt")
-        self._device_table = f.readlines()
+        # reload the devicetable.txt file
+        try:
+            with open(Parameters["HomeFolder"] + "devicetable.txt", "r") as f:
+                self._device_table = f.readlines()
+        except Exception:
+            self._device_table = []
 
     def request_online_phones(self):
         strName = "request_online_phones: "
@@ -1082,8 +1086,11 @@ class BasePlugin:
             extra_devices = 1 # Override device
             self.total_devices_count = count_phone + extra_devices
 
-        f = open(Parameters["HomeFolder"] + "devicetable.txt")
-        self._device_table = f.readlines()
+        try:
+            with open(Parameters["HomeFolder"] + "devicetable.txt", "r") as f:
+                self._device_table = f.readlines()
+        except Exception:
+            self._device_table = []
 
 global _plugin
 _plugin = BasePlugin()
