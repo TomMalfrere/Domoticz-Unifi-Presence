@@ -209,7 +209,7 @@ class BasePlugin:
 
     def onStart(self):
         strName = "onStart: "
-        Domoticz.Debug(strName+"called")
+        Domoticz.Debug(f"{strName} called")
 
         if (Parameters["Mode6"] != "0"):
             Domoticz.Debugging(int(Parameters["Mode6"]))
@@ -219,15 +219,13 @@ class BasePlugin:
         # check if version of domoticz is 2020.2 or higher
         try:
             if int(Parameters["DomoticzVersion"].split('.')[0]) < 2020:  # check domoticz major version
-                Domoticz.Error(
-                    "Domoticz version required by this plugin is 2020.2 (you are running version {}).".format(
-                        Parameters["DomoticzVersion"]))
+                Domoticz.Error(f"Domoticz version required by this plugin is 2020.2 (you are running version {Parameters['DomoticzVersion']}).")
                 Domoticz.Error("Plugin is therefore disabled")
                 self.setVersionCheck(False, "onStart")
             else:
                 self.setVersionCheck(True, "onStart")
         except Exception as err:
-            Domoticz.Error("Domoticz version check returned an error: {}. Plugin is therefore disabled".format(err))
+            Domoticz.Error(f"Domoticz version check returned an error: {err}. Plugin is therefore disabled")
             self.setVersionCheck(False, "onStart")
         if not self.versionCheck:
             return
@@ -242,21 +240,21 @@ class BasePlugin:
 
         # load custom images
         if "UnifiPresenceAnyone" not in Images:
-            Domoticz.Log(strName+"Add UnifiPresenceAnyone icons to Domoticz")
+            Domoticz.Log(f"{strName} Add UnifiPresenceAnyone icons to Domoticz")
             Domoticz.Image("uanyone.zip").Create()
 
         if "UnifiPresenceOverride" not in Images:
-            Domoticz.Log(strName+"Add UnifiPresenceOverride icons to Domoticz")
+            Domoticz.Log(f"{strName} Add UnifiPresenceOverride icons to Domoticz")
             Domoticz.Image("uoverride.zip").Create()
 
         if "UnifiPresenceDevice" not in Images:
-            Domoticz.Log(strName+"Add UnifiPresenceDevice icons to Domoticz")
+            Domoticz.Log(f"{strName} Add UnifiPresenceDevice icons to Domoticz")
             Domoticz.Image("udevice.zip").Create()
 
-        Domoticz.Log("Number of icons loaded = " + str(len(Images)))
+        Domoticz.Log(f"Number of icons loaded = {len(Images)}")
         for item in Images:
-            Domoticz.Log(strName+"Items = "+str(item))
-            Domoticz.Log(strName+"Icon " + str(Images[item].ID) + " Name = " + Images[item].Name)
+            Domoticz.Log(f"{strName} Items = {item}")
+            Domoticz.Log(f"{strName} Icon {Images[item].ID} Name = {Images[item].Name}")
 
         # create devices
         self.login()
@@ -280,63 +278,63 @@ class BasePlugin:
 
     def onConnect(self, Connection, Status, Description):
         strName = "onConnect: "
-        Domoticz.Debug(strName+"called")
-        Domoticz.Debug(strName+"Connection = "+str(Connection))
-        Domoticz.Debug(strName+"Status = "+str(Status))
-        Domoticz.Debug(strName+"Description = "+str(Description))
+        Domoticz.Debug(f"{strName}called")
+        Domoticz.Debug(f"{strName}Connection = {Connection}")
+        Domoticz.Debug(f"{strName}Status = {Status}")
+        Domoticz.Debug(f"{strName}Description = {Description}")
 
     def onMessage(self, Connection, Data):
         strName = "onMessage: "
-        Domoticz.Debug(strName+"called")
+        Domoticz.Debug(f"{strName}called")
         DumpHTTPResponseToLog(Data)
-        Domoticz.Debug(strName+"Data = " +str(Data))
+        Domoticz.Debug(f"{strName}Data = {Data}")
         strData = Data["Data"].decode("utf-8", "ignore")
         status = int(Data["Status"])
 
         if (self._current_status_code == 200 or self._current_status_code == 404):
             unifiResponse = json.loads(strData)
-            Domoticz.Debug(strName+"Retrieved following json: "+json.dumps(unifiResponse))
+            Domoticz.Debug(f"{strName}Retrieved following json: {json.dumps(unifiResponse)}")
             self.onHeartbeat()
 
     def onCommand(self, Unit, Command, Level, Hue):
         strName = "onCommand: "
-        Domoticz.Log(strName+"called for Unit " + str(Unit) + ": Parameter '" + str(Command) + "', Level: " + str(Level))
+        Domoticz.Log(f"{strName}called for Unit {Unit}: Parameter '{Command}', Level: {Level}")
         if self.versionCheck is True:
             if self._current_status_code == 200 or self._current_status_code == 404:
                 if self.UNIFI_OVERRIDE_UNIT == Unit:
                     if Level == 0: # Override Off
                         self.override_time = 0 #seconds
-                        Domoticz.Log(strName+"Override Time = "+str(self.override_time))
+                        Domoticz.Log(f"{strName}Override Time = {self.override_time}")
                         UpdateDevice(self.UNIFI_OVERRIDE_UNIT, int(Level), str(Level))
                         self.Matrix[0][3] = "Off"
                         self.Matrix[0][5] = "No"
                     elif Level == 10: # Override 1 hour
                         self.override_time = 60 * 60 #seconds
-                        Domoticz.Log(strName+"Override Time = "+str(self.override_time))
+                        Domoticz.Log(f"{strName}Override Time = {self.override_time}")
                         UpdateDevice(self.UNIFI_OVERRIDE_UNIT, int(Level), str(Level))
                         self.Matrix[0][3] = "On"
                         self.Matrix[0][5] = "OverRide"
                     elif Level == 20: # Override 2 hours
                         self.override_time = 2 * 60 * 60 #seconds
-                        Domoticz.Log(strName+"Override Time = "+str(self.override_time))
+                        Domoticz.Log(f"{strName}Override Time = {self.override_time}")
                         UpdateDevice(self.UNIFI_OVERRIDE_UNIT, int(Level), str(Level))
                         self.Matrix[0][3] = "On"
                         self.Matrix[0][5] = "OverRide"
                     elif Level == 30: # Override 3 hour
                         self.override_time = 3 * 60 * 60 #seconds
-                        Domoticz.Log(strName+"Override Time = "+str(self.override_time))
+                        Domoticz.Log(f"{strName}Override Time = {self.override_time}")
                         UpdateDevice(self.UNIFI_OVERRIDE_UNIT, int(Level), str(Level))
                         self.Matrix[0][3] = "On"
                         self.Matrix[0][5] = "OverRide"
                     elif Level == 40: # Override On
                         self.override_time = 99999999999 #seconds
-                        Domoticz.Log(strName+"Override Time = "+str(self.override_time))
+                        Domoticz.Log(f"{strName}Override Time = {self.override_time}")
                         UpdateDevice(self.UNIFI_OVERRIDE_UNIT, int(Level), str(Level))
                         self.Matrix[0][3] = "On"
                         self.Matrix[0][5] = "OverRide"
                 if self.UNIFI_OFF_DELAY == Unit:
                     self._Off_Delay = Level + 20 #seconds
-                    Domoticz.Debug(strName+"Off Delay = "+str(self._Off_Delay))
+                    Domoticz.Debug(f"{strName}Off Delay = {self._Off_Delay}s")
                     UpdateDevice(self.UNIFI_OFF_DELAY, Level, str(Level))
                 if self.UNIFI_UPDATE_LOG == Unit:
                     if Command == "On":
