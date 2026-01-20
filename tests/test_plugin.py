@@ -33,7 +33,167 @@ class TestPlugin(TestCase):
     def test_init(self):
         """Test plugin initialization."""
         self.assertIsInstance(self.plugin, BasePlugin)
+        self.assertEqual(self.plugin._Off_Delay, 60)
+        self.assertEqual(self.plugin._log_devices, False)
+        
+    def test_onStart(self):
+        import plugin as plugin_module
+        from types import SimpleNamespace
+        import tempfile
+        import shutil
+        import os
 
+        # Prepare a temporary home folder for the plugin to create devicetable.txt
+        tmpdir = tempfile.mkdtemp()
+        homefolder = tmpdir + os.sep
+
+        # Patch module-level objects used by onStart
+        plugin_module.Parameters = {
+            "Mode6": "0",
+            "DomoticzVersion": "2021.1",
+            "HomeFolder": homefolder,
+            "Mode4": "unificontroller",
+            "Mode1": "default",
+            "Mode2": "Phone1=aa:bb:cc:dd:ee:ff",
+            "Mode3": "No",
+            "Mode5": "No",
+            "Username": "user",
+            "Password": "pass",
+            "Address": "127.0.0.1",
+            "Port": "8443",
+        }
+
+        # Provide a Domoticz mock that exposes the methods onStart calls
+        dom = MagicMock()
+        plugin_module.Domoticz = dom
+
+        # Ensure Images dict exists
+        plugin_module.Images = {}
+
+        # Provide Devices entries for Off Delay (2) and Update Log (3)
+        devices = {
+            2: SimpleNamespace(nValue=10),
+            3: SimpleNamespace(sValue="Off"),
+        }
+        plugin_module.Devices = devices
+
+        # Create plugin instance and stub out login to avoid network calls
+        plugin = plugin_module.BasePlugin()
+        plugin.login = MagicMock()
+
+        # Call onStart and verify expected behavior
+        plugin.onStart()
+
+        # login should be called
+        plugin.login.assert_called()
+
+        # Off delay should be set from Devices[2].nValue + 20
+        self.assertEqual(plugin._Off_Delay, 10 + 20)
+
+        # _log_devices should be False because Devices[3].sValue == "Off"
+        self.assertFalse(plugin._log_devices)
+
+        # Heartbeat should have been requested
+        dom.Heartbeat.assert_called_with(5)
+
+        # devicetable file should have been created
+        self.assertTrue(os.path.isfile(os.path.join(homefolder, "devicetable.txt")))
+
+        # Clean up
+        shutil.rmtree(tmpdir)
+
+    def test_onStop(self):
+        import plugin as plugin_module
+
+        # Patch module-level Domoticz
+        plugin_module.Domoticz = MagicMock()
+
+        # Create plugin instance and stub out logout to avoid network calls
+        plugin = plugin_module.BasePlugin()
+        plugin.logout = MagicMock()
+
+        # Call onStop
+        plugin.onStop()
+
+        # logout should be called
+        plugin.logout.assert_called()
+        
+    def test_onConnect(self):
+        import plugin as plugin_module
+
+        # Patch module-level Domoticz
+        plugin_module.Domoticz = MagicMock()
+
+        # Create plugin instance
+        plugin = plugin_module.BasePlugin()
+
+        # Call onConnect with dummy parameters
+        connection = MagicMock()
+        status = 0
+        description = "Test Description"
+        plugin.onConnect(connection, status, description)
+
+        # No exceptions should be raised, and no specific behavior to assert
+
+    def test_onMessage(self):
+        import plugin as plugin_module
+
+        # Patch module-level Domoticz
+        plugin_module.Domoticz = MagicMock()
+
+        # Create plugin instance
+        plugin = plugin_module.BasePlugin()
+        plugin.onHeartbeat = MagicMock()
+
+        # Call onMessage with dummy parameters
+        connection = MagicMock()
+        # Provide the dict structure expected by onMessage
+        data = {'Data': b'{}', 'Status': '200'}
+        # Mock DumpHTTPResponseToLog to avoid exercising its implementation
+        plugin_module.DumpHTTPResponseToLog = MagicMock()
+        plugin._current_status_code = 200
+        plugin.onMessage(connection, data)
+        
+        plugin.onHeartbeat.assert_called()
+       
+        plugin.onHeartbeat.reset_mock()
+        plugin._current_status_code = 500
+        plugin.onMessage(connection, data)
+        plugin.onHeartbeat.assert_not_called()
+
+        # No exceptions should be raised, and no specific behavior to assert
+
+    def test_onCommand(self):
+        import plugin as plugin_module
+        
+        # Patch module-level Domoticz
+        plugin_module.Domoticz = MagicMock()
+        
+        # Create plugin instance
+        plugin = plugin_module.BasePlugin()
+        # Call onCommand with dummy parameters
+        unit = 1
+        command = "On"
+        level = 50
+        hue = 100
+        plugin.onCommand(unit, command, level, hue)
+
+    def test_setVersionCheck(self):
+        import plugin as plugin_module
+        
+        # Patch module-level Domoticz
+        plugin_module.Domoticz = MagicMock()
+        
+        # Create plugin instance
+        plugin = plugin_module.BasePlugin()
+        # Call setVersionCheck
+        plugin.setVersionCheck(True, "Test Note")
+        
+        self.assertTrue(plugin.versionCheck)
+        
+        plugin.setVersionCheck(False, "Test Note")
+        
+        self.assertFalse(plugin.versionCheck)
 
 class TestRequestOnlinePhones(TestCase):
     """Test cases for request_online_phones method error handling"""
@@ -231,3 +391,4 @@ class TestLoginMethod(TestCase):
             plugin_inst.login()
         except UnboundLocalError as e:
             self.fail(f"UnboundLocalError raised in login: {e}. Variable 'r' not defined.")
+
