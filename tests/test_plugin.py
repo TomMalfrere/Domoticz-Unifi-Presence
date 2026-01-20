@@ -246,6 +246,35 @@ class TestPlugin(TestCase):
         # self.domoticz.Debug.assert_has_calls(expected)
         # expected = [call("onHeartbeat: Attempting to reconnect Unifi Controller")]
         # self.domoticz.Log.assert_has_calls(expected)
+        
+    def test_InitAfterLogin(self):
+        self.plugin.detectUnifiDevices = MagicMock()
+        self.plugin.create_devices = MagicMock()
+        
+        self.domoticz.Debug = MagicMock()
+        self.domoticz.Log = MagicMock()
+        
+        # Call InitAfterLogin
+        self.plugin.InitAfterLogin()
+        
+        self.plugin.detectUnifiDevices.assert_not_called()
+        self.plugin.create_devices.assert_not_called()
+
+        self.domoticz.Debug.assert_called_with("InitAfterLogin: called")
+        self.domoticz.Log.assert_not_called()
+        
+        # self.domoticz.Debug.reset_mock()
+        # self.domoticz.Log.reset_mock()
+        
+        # self.plugin._current_status_code = 200
+        
+        # self.plugin.InitAfterLogin()
+        
+        # self.plugin.detectUnifiDevices.assert_called()
+        # self.plugin.create_devices.assert_called()
+        
+        # self.domoticz.Debug.assert_called_with("InitAfterLogin: called")
+        # self.domoticz.Log.assert_not_called()
 
     def test_setVersionCheck(self):
         # Call setVersionCheck
