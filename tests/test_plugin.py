@@ -247,6 +247,156 @@ class TestPlugin(TestCase):
         # expected = [call("onHeartbeat: Attempting to reconnect Unifi Controller")]
         # self.domoticz.Log.assert_has_calls(expected)
         
+    def test_logout(self):
+        self.domoticz.Debug = MagicMock()
+        self.domoticz.Log = MagicMock()
+        self.domoticz.Error = MagicMock()
+        
+        self.plugin._session.post = MagicMock()
+        self.plugin._session.close = MagicMock()
+        self.plugin._baseurl = "https://baseurl"
+        self.plugin._timeout_timer = None
+  
+        # test with _current_status_code None      
+        self.domoticz.Debug.reset_mock()
+        self.domoticz.Log.reset_mock()
+        self.domoticz.Error.reset_mock()
+        self.plugin._session.post.reset_mock()
+        self.plugin._session.close.reset_mock()
+        self.plugin._current_status_code = None
+        self.plugin.logout()
+        #self.domoticz.Debug.assert_called_with("logout: called")
+        self.domoticz.Log.assert_not_called()
+        self.domoticz.Error.assert_not_called()
+        self.plugin._session.post.assert_not_called()
+        self.plugin._session.close.assert_not_called()
+        self.assertEqual(self.plugin._current_status_code, None)
+
+        # test with status code 200
+        # Parameters["Mode4"] = "unificontroller"
+        self.domoticz.Debug.reset_mock()
+        self.domoticz.Log.reset_mock()
+        self.domoticz.Error.reset_mock()
+        self.plugin._session.post.reset_mock()
+        self.plugin._session.close.reset_mock()
+        self.plugin._current_status_code = 200
+        self.plugin.logout()
+        #self.domoticz.Debug.assert_called_with("logout: called")
+        self.domoticz.Log.assert_called_with('logout: Logout of the Unifi API')
+        self.domoticz.Error.assert_not_called()
+        self.plugin._session.post.assert_called_with("https://baseurl/logout")
+        self.plugin._session.close.assert_called()
+        self.assertEqual(self.plugin._current_status_code, 999)
+        self.assertIsNone(self.plugin._timeout_timer)
+        
+        # test with status code 200
+        # Parameters["Mode4"] = "dreammachinepro"
+        self.domoticz.Debug.reset_mock()
+        self.domoticz.Log.reset_mock()
+        self.domoticz.Error.reset_mock()
+        self.plugin._session.post.reset_mock()
+        self.plugin._session.close.reset_mock()
+        self.plugin._current_status_code = 200
+        plugin_module.Parameters["Mode4"] = "dreammachinepro"
+        self.plugin.logout()
+        #self.domoticz.Debug.assert_called_with("logout: called")
+        self.domoticz.Log.assert_called_with('logout: Logout of the Unifi API')
+        self.domoticz.Error.assert_not_called()
+        self.plugin._session.post.assert_called_with("https://baseurl/api/auth")
+        self.plugin._session.close.assert_called()
+        self.assertEqual(self.plugin._current_status_code, 999)
+        self.assertIsNone(self.plugin._timeout_timer)
+
+        # test with status code 200
+        # Parameters["Mode4"] = "something else"
+        self.domoticz.Debug.reset_mock()
+        self.domoticz.Log.reset_mock()
+        self.domoticz.Error.reset_mock()
+        self.plugin._session.post.reset_mock()
+        self.plugin._session.close.reset_mock()
+        self.plugin._current_status_code = 200
+        plugin_module.Parameters["Mode4"] = "something else"
+        self.plugin.logout()
+        #self.domoticz.Debug.assert_called_with("logout: called")
+        self.domoticz.Log.assert_called_with('logout: Logout of the Unifi API')
+        self.domoticz.Error.assert_called_with("Check configuration!!")
+        self.plugin._session.post.assert_not_called()
+        self.plugin._session.close.assert_called()
+        self.assertEqual(self.plugin._current_status_code, 999)
+        self.assertIsNone(self.plugin._timeout_timer)
+
+        # test with status code 404
+        self.domoticz.Debug.reset_mock()
+        self.domoticz.Log.reset_mock()
+        self.domoticz.Error.reset_mock()
+        self.plugin._session.post.reset_mock()
+        self.plugin._session.close.reset_mock()
+        self.plugin._current_status_code = 404
+        self.plugin.logout()
+        #self.domoticz.Debug.assert_called_with("logout: called")
+        self.domoticz.Log.assert_not_called()
+        self.domoticz.Error.assert_not_called()
+        self.plugin._session.post.assert_not_called()
+        self.plugin._session.close.assert_not_called()
+        self.assertEqual(self.plugin._current_status_code, 404)
+        self.assertIsNone(self.plugin._timeout_timer)
+
+    def test_logout_post_read_timeout_exception(self):
+        """Logout should handle requests.exceptions.ReadTimeout without closing session."""
+        self.domoticz.Debug = MagicMock()
+        self.domoticz.Log = MagicMock()
+        self.domoticz.Error = MagicMock()
+
+        # Simulate ReadTimeout when posting logout
+        self.plugin._session.post = MagicMock(side_effect=requests.exceptions.ReadTimeout("timeout"))
+        self.plugin._session.close = MagicMock()
+        self.plugin._baseurl = "https://baseurl"
+        plugin_module.Parameters["Mode4"] = "unificontroller"
+        self.plugin._current_status_code = 200
+
+        self.plugin.logout()
+
+        self.domoticz.Error.assert_called_with("Request to unificontroller timed out during logout.")
+        self.plugin._session.close.assert_not_called()
+        self.assertEqual(self.plugin._current_status_code, 200)
+
+    def test_logout_post_connection_error_exception(self):
+        """Logout should handle requests.exceptions.ConnectionError without closing session."""
+        self.domoticz.Debug = MagicMock()
+        self.domoticz.Log = MagicMock()
+        self.domoticz.Error = MagicMock()
+
+        # Simulate ConnectionError when posting logout
+        self.plugin._session.post = MagicMock(side_effect=requests.exceptions.ConnectionError("conn refused"))
+        self.plugin._session.close = MagicMock()
+        self.plugin._baseurl = "https://baseurl"
+        plugin_module.Parameters["Mode4"] = "dreammachinepro"
+        self.plugin._current_status_code = 200
+
+        self.plugin.logout()
+
+        self.domoticz.Error.assert_called_with("Connection refused to dreammachinepro during logout.")
+        self.plugin._session.close.assert_not_called()
+        self.assertEqual(self.plugin._current_status_code, 200)
+
+    def test_logout_post_connect_timeout_exception(self):
+        """Logout should handle requests.exceptions.ConnectTimeout without closing session."""
+        self.domoticz.Debug = MagicMock()
+        self.domoticz.Log = MagicMock()
+        self.domoticz.Error = MagicMock()
+
+        # Simulate ConnectionError when posting logout
+        self.plugin._session.post = MagicMock(side_effect=requests.exceptions.HTTPError("HTTPError"))
+        self.plugin._session.close = MagicMock()
+        self.plugin._baseurl = "https://baseurl"
+        self.plugin._current_status_code = 200
+
+        self.plugin.logout()
+
+        self.domoticz.Error.assert_called_with('Logout failure: HTTPError')
+        self.plugin._session.close.assert_not_called()
+        self.assertEqual(self.plugin._current_status_code, 200)
+        
     def test_InitAfterLogin(self):
         self.plugin.detectUnifiDevices = MagicMock()
         self.plugin.create_devices = MagicMock()
@@ -275,6 +425,12 @@ class TestPlugin(TestCase):
         
         # self.domoticz.Debug.assert_called_with("InitAfterLogin: called")
         # self.domoticz.Log.assert_not_called()
+
+    # def test_create_devices(self):
+    #     self.domoticz.Device = MagicMock()
+        
+    #     # Call create_devices
+    #     self.plugin.create_devices()
 
     def test_setVersionCheck(self):
         # Call setVersionCheck
