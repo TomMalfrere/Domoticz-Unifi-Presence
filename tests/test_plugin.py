@@ -179,28 +179,36 @@ class TestPlugin(TestCase):
         self.domoticz.Debug = MagicMock()
         self.domoticz.Log = MagicMock()
         
+        # test with versionCheck False
         self.plugin.versionCheck = False
-        
-        # Call onHeartbeat
         self.plugin.onHeartbeat()
-
         self.domoticz.Debug.assert_called_with("onHeartbeat: called")
         self.domoticz.Log.assert_not_called()
         
+        # test with versionCheck True and _current_status_code None
         self.domoticz.Debug.reset_mock()
         self.domoticz.Log.reset_mock()
-
         self.plugin.versionCheck = True
         self.plugin._current_status_code = None
-        
-        # Call onHeartbeat
         self.plugin.onHeartbeat()
-
         expected = [call("onHeartbeat: called"), 
                     call("login: called")]
         self.domoticz.Debug.assert_has_calls(expected)
         expected = [call("onHeartbeat: Attempting to reconnect Unifi Controller")]
         self.domoticz.Log.assert_has_calls(expected)
+
+        # test with versionCheck True and _current_status_code 200
+        # self.domoticz.Debug.reset_mock()
+        # self.domoticz.Log.reset_mock()
+        # self.plugin.versionCheck = True
+        # self.plugin._current_status_code = 200
+        # self.plugin.Matrix[0][3] = "Off"
+        # self.plugin.onHeartbeat()
+        # expected = [call("onHeartbeat: called"), 
+        #             call("login: called")]
+        # self.domoticz.Debug.assert_has_calls(expected)
+        # expected = [call("onHeartbeat: Attempting to reconnect Unifi Controller")]
+        # self.domoticz.Log.assert_has_calls(expected)
 
         # self.domoticz.Debug.reset_mock()
         # self.domoticz.Log.reset_mock()
@@ -246,6 +254,22 @@ class TestPlugin(TestCase):
         # self.domoticz.Debug.assert_has_calls(expected)
         # expected = [call("onHeartbeat: Attempting to reconnect Unifi Controller")]
         # self.domoticz.Log.assert_has_calls(expected)
+        
+    def test_getCookies(self):
+        self.domoticz.Debug = MagicMock()
+        self.domoticz.Log = MagicMock()
+        
+        mocked_cookie_jar = MagicMock()
+        mocked_cookie_jar.get_dict.return_value = {'a': '1', 'b': '2'}
+        
+        # Call getCookies
+        cookies = self.plugin.getCookies(mocked_cookie_jar, "example.com")
+        
+        #self.domoticz.Debug.assert_called_with("getCookies: called")
+        self.domoticz.Log.assert_not_called()
+        self.assertIsInstance(cookies, str)
+        parts = cookies.split(';')
+        self.assertEqual(set(parts), {'a=1', 'b=2'})
         
     def test_logout(self):
         self.domoticz.Debug = MagicMock()
@@ -398,11 +422,13 @@ class TestPlugin(TestCase):
         self.assertEqual(self.plugin._current_status_code, 200)
         
     def test_InitAfterLogin(self):
+        self.domoticz.Debug = MagicMock()
+        self.domoticz.Log = MagicMock()
+        self.domoticz.Error = MagicMock()
+        
         self.plugin.detectUnifiDevices = MagicMock()
         self.plugin.create_devices = MagicMock()
         
-        self.domoticz.Debug = MagicMock()
-        self.domoticz.Log = MagicMock()
         
         # Call InitAfterLogin
         self.plugin.InitAfterLogin()
