@@ -179,6 +179,7 @@ class TestPlugin(TestCase):
     def test_onHeartbeat(self):
         self.domoticz.Debug = MagicMock()
         self.domoticz.Log = MagicMock()
+        self.domoticz.Error = MagicMock()
         
         # test with versionCheck False
         self.plugin.versionCheck = False
@@ -189,6 +190,7 @@ class TestPlugin(TestCase):
         # test with versionCheck True and _current_status_code None
         self.domoticz.Debug.reset_mock()
         self.domoticz.Log.reset_mock()
+        self.domoticz.Error.reset_mock()
         self.plugin.versionCheck = True
         self.plugin._current_status_code = None
         self.plugin.onHeartbeat()
@@ -198,63 +200,74 @@ class TestPlugin(TestCase):
         expected = [call("onHeartbeat: Attempting to reconnect Unifi Controller")]
         self.domoticz.Log.assert_has_calls(expected)
 
-        # test with versionCheck True and _current_status_code 200
-        # self.domoticz.Debug.reset_mock()
-        # self.domoticz.Log.reset_mock()
-        # self.plugin.versionCheck = True
-        # self.plugin._current_status_code = 200
-        # self.plugin.Matrix[0][3] = "Off"
-        # self.plugin.onHeartbeat()
-        # expected = [call("onHeartbeat: called"), 
-        #             call("login: called")]
-        # self.domoticz.Debug.assert_has_calls(expected)
-        # expected = [call("onHeartbeat: Attempting to reconnect Unifi Controller")]
-        # self.domoticz.Log.assert_has_calls(expected)
-
-        # self.domoticz.Debug.reset_mock()
-        # self.domoticz.Log.reset_mock()
-
-        # self.plugin.versionCheck = True
-        # self.plugin._current_status_code = 200
+        # test with versionCheck True 
+        #       _current_status_code 200
+        #       Matrix[0][3] = "Off"
+        self.domoticz.Debug.reset_mock()
+        self.domoticz.Log.reset_mock()
+        self.domoticz.Error.reset_mock()
+        self.plugin.versionCheck = True
+        self.plugin._current_status_code = 200
+        # Initialize Matrix as a 2D list since it's not set by InitAfterLogin in test
+        self.plugin.Matrix = [["OverRide", 
+                               "00:00:00:00:00:00", 
+                               255, 
+                               "Off", 
+                               "No", 
+                               "No", 
+                               None, 
+                               None]]
+        self.plugin.Matrix[0][3] = "Off"
+        self.plugin.request_details = MagicMock()
+        self.plugin.request_online_phones = MagicMock()
+        self.plugin.onHeartbeat()
+        expected = [call("onHeartbeat: called"), 
+                    call('onHeartbeat: Requesting Unifi Controller details')]
+        self.domoticz.Debug.assert_has_calls(expected)
+        expected = []
+        self.domoticz.Log.assert_has_calls(expected)
         
-        # # Call onHeartbeat
-        # self.plugin.onHeartbeat()
-
-        # expected = [call("onHeartbeat: called"), 
-        #             call("login: called")]
-        # self.domoticz.Debug.assert_has_calls(expected)
-        # expected = [call("onHeartbeat: Attempting to reconnect Unifi Controller")]
-        # self.domoticz.Log.assert_has_calls(expected)
-
-        # self.domoticz.Debug.reset_mock()
-        # self.domoticz.Log.reset_mock()
-
-        # self.plugin.versionCheck = True
-        # self.plugin._current_status_code = 401
+        # test with versionCheck True 
+        #       _current_status_code 200
+        #       Matrix[0][3] = "On"
+        self.domoticz.Debug.reset_mock()
+        self.domoticz.Log.reset_mock()
+        self.domoticz.Error.reset_mock()
+        self.plugin.Matrix[0][3] = "On"
+        self.plugin.request_details.reset_mock()
+        self.plugin.request_online_phones.reset_mock()
+        plugin_module.Devices[self.plugin.UNIFI_OFF_DELAY] = MagicMock()
+        plugin_module.Devices[self.plugin.UNIFI_OFF_DELAY].nValue = 10
+        plugin_module.Devices[255] = MagicMock()
+        plugin_module.Devices[255].LastUpdate = '2023-01-01 12:00:00'
+        self.plugin.onHeartbeat()
+        expected = [call("onHeartbeat: Requesting Unifi Controller details")]
+        self.domoticz.Debug.assert_has_calls(expected)
+        self.assertEqual(self.plugin.Matrix[0][3], "Off")
+        self.assertEqual(self.plugin.Matrix[0][4], "Yes")
+        self.plugin.request_details.assert_called()
+        self.plugin.request_online_phones.assert_called()
         
-        # # Call onHeartbeat
-        # self.plugin.onHeartbeat()
-
-        # expected = [call("onHeartbeat: called"), 
-        #             call("login: called")]
-        # self.domoticz.Debug.assert_has_calls(expected)
-        # expected = [call("onHeartbeat: Attempting to reconnect Unifi Controller")]
-        # self.domoticz.Log.assert_has_calls(expected)
-
-        # self.domoticz.Debug.reset_mock()
-        # self.domoticz.Log.reset_mock()
-
-        # self.plugin.versionCheck = True
-        # self.plugin._current_status_code = 404
-        
-        # # Call onHeartbeat
-        # self.plugin.onHeartbeat()
-
-        # expected = [call("onHeartbeat: called"), 
-        #             call("login: called")]
-        # self.domoticz.Debug.assert_has_calls(expected)
-        # expected = [call("onHeartbeat: Attempting to reconnect Unifi Controller")]
-        # self.domoticz.Log.assert_has_calls(expected)
+        # test with versionCheck True 
+        #       _current_status_code 200
+        #       Matrix[0][3] = "On"
+        self.domoticz.Debug.reset_mock()
+        self.domoticz.Log.reset_mock()
+        self.domoticz.Error.reset_mock()
+        self.plugin.Matrix[0][3] = "On"
+        self.plugin.request_details.reset_mock()
+        self.plugin.request_online_phones.reset_mock()
+        plugin_module.Devices[self.plugin.UNIFI_OFF_DELAY] = MagicMock()
+        plugin_module.Devices[self.plugin.UNIFI_OFF_DELAY].nValue = 0
+        plugin_module.Devices[255] = MagicMock()
+        plugin_module.Devices[255].LastUpdate = '2023-01-01 12:00:00'
+        self.plugin.onHeartbeat()
+        expected = [call("onHeartbeat: Requesting Unifi Controller details")]
+        self.domoticz.Debug.assert_has_calls(expected)
+        self.assertEqual(self.plugin.Matrix[0][3], "Off")
+        self.assertEqual(self.plugin.Matrix[0][4], "Yes")
+        self.plugin.request_details.assert_called()
+        self.plugin.request_online_phones.assert_called()
         
     def test_getCookies(self):
         self.domoticz.Debug = MagicMock()
