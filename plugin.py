@@ -461,6 +461,7 @@ class BasePlugin:
                 controller = "Dream Machine Pro"
             else:
                 Domoticz.Error(strName+"Check configuration!!")
+                return
 
             self._current_status_code = r.status_code
             if self._current_status_code == 200:
