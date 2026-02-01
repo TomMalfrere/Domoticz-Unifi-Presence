@@ -147,6 +147,7 @@ class TestPlugin(TestCase):
         level = 50
         hue = 100
         self.plugin.onCommand(unit, command, level, hue)
+        # TODO: do more result checking
 
     def test_onNotification(self):
         # Call onNotification with dummy parameters
@@ -271,6 +272,187 @@ class TestPlugin(TestCase):
         parts = cookies.split(';')
         self.assertEqual(set(parts), {'a=1', 'b=2'})
         
+    def test_login(self):
+        self.domoticz.Debug = MagicMock()
+        self.domoticz.Log = MagicMock()
+        self.domoticz.Error = MagicMock()
+        
+        self.plugin.InitAfterLogin = MagicMock()
+        
+        # test successful login on unificontroller
+        mock_session = MagicMock()
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.cookies = MagicMock()
+        mock_response.headers = {}
+        mock_session.post.return_value = mock_response
+        with patch('plugin.Session', return_value=mock_session):
+            self.plugin.login()
+            
+            self.domoticz.Debug.assert_called_with("login: called")
+            self.domoticz.Log.assert_called_with("login: Login successful into Unifi Controller")
+            self.domoticz.Error.assert_not_called()
+            # Verify post was called
+            mock_session.post.assert_called_once()
+
+        # test failed login with 400
+        self.domoticz.Debug.reset_mock()
+        self.domoticz.Log.reset_mock()
+        self.domoticz.Error.reset_mock()
+        self.plugin.InitAfterLogin.reset_mock()
+        mock_session.reset_mock()
+        mock_response.reset_mock()
+        mock_response.status_code = 400
+        mock_response.cookies.reset_mock()
+        mock_response.headers = {}
+        mock_session.post.return_value = mock_response
+        with patch('plugin.Session', return_value=mock_session):
+            self.plugin.login()
+            
+            self.domoticz.Debug.assert_called_with("login: called")
+            self.domoticz.Log.assert_not_called()
+            self.domoticz.Error.assert_called_with('login: Failed to log in to api (Unifi Controller) with provided credentials (400)')
+            # Verify post was called
+            mock_session.post.assert_called_once()
+
+        # test failed login with 401
+        self.domoticz.Debug.reset_mock()
+        self.domoticz.Log.reset_mock()
+        self.domoticz.Error.reset_mock()
+        self.plugin.InitAfterLogin.reset_mock()
+        mock_session.reset_mock()
+        mock_response.reset_mock()
+        mock_response.status_code = 401
+        mock_response.cookies.reset_mock()
+        mock_response.headers = {}
+        mock_session.post.return_value = mock_response
+        with patch('plugin.Session', return_value=mock_session):
+            # first login attempt
+            self.plugin.login()
+            self.domoticz.Debug.assert_called_with("login: called")
+            self.domoticz.Log.assert_called_with('login: First attempt failed to login to the Unifi Controller(URL=https://127.0.0.1:8443) with errorcode 401')
+            self.domoticz.Error.assert_not_called()
+            # Verify post was called
+            mock_session.post.assert_called_once()
+
+            # second login attempt
+            self.domoticz.Debug.reset_mock()
+            self.domoticz.Log.reset_mock()
+            self.domoticz.Error.reset_mock()
+            mock_session.post.reset_mock()
+            self.plugin.login()
+            self.domoticz.Debug.assert_called_with("login: called")
+            self.domoticz.Log.assert_not_called()
+            self.domoticz.Error.assert_called_with('login: Failed to login to the Unifi Controller with errorcode 401')
+            # Verify post was called
+            mock_session.post.assert_called_once()
+            
+        # test successful login on dreammachinepro
+        plugin_module.Parameters["Mode4"] = "dreammachinepro"
+        self.domoticz.Debug.reset_mock()
+        self.domoticz.Log.reset_mock()
+        self.domoticz.Error.reset_mock()
+        mock_session.reset_mock()
+        mock_response.reset_mock()
+        mock_response.status_code = 200
+        mock_response.cookies.reset_mock()
+        mock_response.headers = {'X-CSRF-Token': 'mock_csrf_token'}
+        mock_session.post.return_value = mock_response
+        with patch('plugin.Session', return_value=mock_session):
+            self.plugin.login()
+            
+            self.domoticz.Debug.assert_called_with("login: called")
+            self.domoticz.Log.assert_called_with('login: Login successful into Dream Machine Pro')
+            self.domoticz.Error.assert_not_called()
+            # Verify post was called
+            mock_session.post.assert_called_once()
+
+        # test successful login on something else
+        plugin_module.Parameters["Mode4"] = "somethingelse"
+        self.domoticz.Debug.reset_mock()
+        self.domoticz.Log.reset_mock()
+        self.domoticz.Error.reset_mock()
+        mock_session.reset_mock()
+        mock_response.reset_mock()
+        mock_response.status_code = 200
+        mock_response.cookies.reset_mock()
+        mock_response.headers = {'X-CSRF-Token': 'mock_csrf_token'}
+        mock_session.post.return_value = mock_response
+        with patch('plugin.Session', return_value=mock_session):
+            self.plugin.login()
+            self.domoticz.Debug.assert_called_with("login: called")
+            self.domoticz.Log.assert_not_called()
+            self.domoticz.Error.assert_called_once_with("login: Check configuration!!")
+            # Verify post call was not made
+            mock_session.post.assert_not_called()
+
+    def test_login_post_read_timeout_exception(self):
+        """Logout should handle requests.exceptions.ReadTimeout without closing session."""
+        self.domoticz.Debug = MagicMock()
+        self.domoticz.Log = MagicMock()
+        self.domoticz.Error = MagicMock()
+
+
+        self.plugin.InitAfterLogin = MagicMock()
+        
+        # test successful login on unificontroller
+        mock_session = MagicMock()
+        # Simulate ReadTimeout when posting logout
+        mock_session.post = MagicMock(side_effect=requests.exceptions.ReadTimeout("timeout"))
+        with patch('plugin.Session', return_value=mock_session):
+            self.plugin.login()
+            
+            self.domoticz.Debug.assert_called_with("login: called")
+            self.domoticz.Log.assert_not_called()
+            self.domoticz.Error.assert_called_once_with('Request to unificontroller timed out.')
+            # Verify post was called
+            mock_session.post.assert_called_once()
+            self.assertEqual(self.plugin._current_status_code, 999)
+
+    def test_login_post_connection_error_exception(self):
+        """Logout should handle requests.exceptions.ConnectionError without closing session."""
+        self.domoticz.Debug = MagicMock()
+        self.domoticz.Log = MagicMock()
+        self.domoticz.Error = MagicMock()
+
+
+        self.plugin.InitAfterLogin = MagicMock()
+        
+        # test successful login on unificontroller
+        mock_session = MagicMock()
+        # Simulate ReadTimeout when posting logout
+        mock_session.post = MagicMock(side_effect=requests.exceptions.ConnectionError("timeout"))
+        with patch('plugin.Session', return_value=mock_session):
+            self.plugin.login()
+            
+            self.domoticz.Debug.assert_called_with("login: called")
+            self.domoticz.Log.assert_not_called()
+            self.domoticz.Error.assert_called_once_with('Connection refused to unificontroller')
+            # Verify post was called
+            mock_session.post.assert_called_once()
+            self.assertEqual(self.plugin._current_status_code, 999)
+
+    def test_login_post_http_error_exception(self):
+        """Logout should handle requests.exceptions.HTTPError without closing session."""
+        self.domoticz.Debug = MagicMock()
+        self.domoticz.Log = MagicMock()
+        self.domoticz.Error = MagicMock()
+
+        self.plugin.InitAfterLogin = MagicMock()
+        
+        mock_session = MagicMock()
+        # Simulate ReadTimeout when posting logout
+        mock_session.post = MagicMock(side_effect=requests.exceptions.HTTPError("HTTPError"))
+        with patch('plugin.Session', return_value=mock_session):
+            self.plugin.login()
+            
+            self.domoticz.Debug.assert_called_with("login: called")
+            self.domoticz.Log.assert_not_called()
+            self.domoticz.Error.assert_called_once_with("Login failed. If it's first attempt then ok, otherwise there is something wrong: HTTPError")
+            # Verify post was called
+            mock_session.post.assert_called_once()
+            self.assertIsNone(self.plugin._current_status_code)
+                
     def test_logout(self):
         self.domoticz.Debug = MagicMock()
         self.domoticz.Log = MagicMock()
@@ -429,15 +611,31 @@ class TestPlugin(TestCase):
         self.plugin.detectUnifiDevices = MagicMock()
         self.plugin.create_devices = MagicMock()
         
+        plugin_module.Parameters["Mode2"] = "Phone1=aa:bb:cc:dd:ee:ff,Phone2=11:22:33:44:55:66"
         
-        # Call InitAfterLogin
+        # test with _current_status_code None      
+        self.domoticz.Debug.reset_mock()
+        self.domoticz.Log.reset_mock()
+        self.domoticz.Error.reset_mock()
+        self.plugin._current_status_code = None        
         self.plugin.InitAfterLogin()
-        
         self.plugin.detectUnifiDevices.assert_not_called()
         self.plugin.create_devices.assert_not_called()
-
         self.domoticz.Debug.assert_called_with("InitAfterLogin: called")
         self.domoticz.Log.assert_not_called()
+        self.domoticz.Error.assert_not_called()
+        
+        # test with _current_status_code 200      
+        self.domoticz.Debug.reset_mock()
+        self.domoticz.Log.reset_mock()
+        self.domoticz.Error.reset_mock()
+        self.plugin._current_status_code = 200        
+        self.plugin.InitAfterLogin()
+        self.plugin.detectUnifiDevices.assert_called()
+        self.plugin.create_devices.assert_called()
+        self.domoticz.Debug.assert_called_with("InitAfterLogin: called")
+        self.domoticz.Log.assert_not_called()
+        self.domoticz.Error.assert_not_called()
         
         # self.domoticz.Debug.reset_mock()
         # self.domoticz.Log.reset_mock()
