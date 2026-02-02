@@ -91,3 +91,12 @@ def Error(s):
 
 def Debugging(i):
     print("Debug: turned on")
+
+def UpdateDevice(Unit, nValue, sValue, *args):
+    if Unit in Devices:
+        Devices[Unit].nValue = nValue
+        Devices[Unit].sValue = sValue
+        # Optionally, update LastUpdate if needed
+        if hasattr(Devices[Unit], 'LastUpdate'):
+            from datetime import datetime
+            Devices[Unit].LastUpdate = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
