@@ -60,7 +60,13 @@ class X:
 def Image(sZip:str):
     Debug("create image: "+sZip)
     img = X(sZip)
-    id = sZip.replace(".zip","")
+    # Map zip names to expected image keys
+    key_map = {
+        "uanyone.zip": "UnifiPresenceAnyone",
+        "uoverride.zip": "UnifiPresenceOverride",
+        "udevice.zip": "UnifiPresenceDevice"
+    }
+    id = key_map.get(sZip, sZip.replace(".zip",""))
     Images[id] = img
     return img
 
