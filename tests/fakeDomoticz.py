@@ -28,23 +28,25 @@ class X:
     nValue: int = None
     LastLevel: int = None
     Image:str = None
-    def __init__(self, aID:str, Name:str=Name,DeviceID:str =None,Image:str=None) -> None:
+    def __init__(self, aID:str, Name:str=None, DeviceID:str=None, Image:str=None, Unit:str=None, **kwargs) -> None:
         self.ID = aID
-        if(Name):
-            self.Name = Name
-        else:
-            self.Name = aID
-        self.Unit = aID
-        if(DeviceID):
+        self.Name = Name or str(aID)
+        self.Unit = Unit or aID
+        if DeviceID:
             self.DeviceID = DeviceID
         else:
             self.DeviceID = aID    
-        self.sValue = aID
+        self.sValue = str(aID)
         self.nValue = None
         self.Image = Image
+        # Set any additional kwargs as attributes
+        for k, v in kwargs.items():
+            setattr(self, k, v)
         pass
     
     def Create(self):
+        # Add to Devices
+        Devices[self.Unit] = self
         pass
 
 
@@ -71,11 +73,8 @@ def Image(sZip:str):
     return img
 
 
-def Device(Name:str, Unit:str, TypeName:str,
-                        Used:bool=1,
-                        Switchtype:int=18, DeviceID:str=None,Options:str=None):
-    x = X(Unit, Name=Name, DeviceID=DeviceID )
-    Devices[Unit] = x
+def Device(Name:str=None, Unit:str=None, TypeName:str=None, Used:bool=1, Switchtype:int=18, DeviceID:str=None, Options:str=None, **kwargs):
+    x = X(Unit or Name, Name=Name, Unit=Unit, DeviceID=DeviceID, TypeName=TypeName, Used=Used, Switchtype=Switchtype, Options=Options, **kwargs)
     return x
 
 def Log(s):
