@@ -54,15 +54,16 @@ class TestPlugin(TestCase):
         # Ensure Images and Devices dicts exist and use fakeDomoticz ones
         plugin_module.Images = fakeDomoticz.Images
         plugin_module.Devices = fakeDomoticz.Devices
+        plugin_module.UpdateDevice = fakeDomoticz.UpdateDevice
 
         # Make Domoticz.Image call fakeDomoticz.Image
         self.domoticz.Image.side_effect = lambda zip: fakeDomoticz.Image(zip)
 
         # Provide Devices entries for Off Delay (2) and Update Log (3)
-        devices = {2: SimpleNamespace(nValue=10),
-                   3: SimpleNamespace(sValue="Off"),
+        devices = {2: SimpleNamespace(nValue=10, sValue="10"),
+                   3: SimpleNamespace(nValue=0, sValue="Off"),
         }
-        plugin_module.Devices = devices
+        plugin_module.Devices.update(devices)
 
         # Create plugin instance and stub out login to avoid network calls
         self.plugin = plugin_module.BasePlugin()
