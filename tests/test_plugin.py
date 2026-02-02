@@ -692,7 +692,14 @@ class TestPlugin(TestCase):
         self.assertFalse(self.plugin.versionCheck)
 
     def test_create_devices(self):
-        
+        self.plugin.login = MagicMock()
+        self.domoticz.Heartbeat = MagicMock()
+        plugin_module.Devices[self.plugin.UNIFI_OFF_DELAY] = MagicMock()
+        plugin_module.Devices[self.plugin.UNIFI_OFF_DELAY].nValue = 10
+        plugin_module.Devices[self.plugin.UNIFI_UPDATE_LOG] = MagicMock()
+        plugin_module.Devices[self.plugin.UNIFI_UPDATE_LOG].sValue = "On"
+
+        self.plugin.onStart()
         
         # Call create_devices
         self.plugin.create_devices()
