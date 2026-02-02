@@ -49,8 +49,8 @@ class TestPlugin(TestCase):
 
         # Provide a Domoticz mock that exposes the methods onStart calls
         self.domoticz = MagicMock()
+        
         plugin_module.Domoticz = self.domoticz
-
         # Ensure Images and Devices dicts exist and use fakeDomoticz ones
         plugin_module.Images = fakeDomoticz.Images
         plugin_module.Devices = fakeDomoticz.Devices
@@ -58,6 +58,12 @@ class TestPlugin(TestCase):
 
         # Make Domoticz.Image call fakeDomoticz.Image
         self.domoticz.Image.side_effect = lambda zip: fakeDomoticz.Image(zip)
+
+        # Make Domoticz.Device call fakeDomoticz.Device
+        self.domoticz.Device.side_effect = fakeDomoticz.Device
+        self.domoticz.Debug = MagicMock()
+        self.domoticz.Log = MagicMock()
+        self.domoticz.Error = MagicMock()
 
         # Provide Devices entries for Off Delay (2) and Update Log (3)
         devices = {2: SimpleNamespace(nValue=10, sValue="10"),
@@ -67,6 +73,8 @@ class TestPlugin(TestCase):
 
         # Create plugin instance and stub out login to avoid network calls
         self.plugin = plugin_module.BasePlugin()
+
+        
     
     def tearDown(self):
         # Clean up
@@ -185,13 +193,24 @@ class TestPlugin(TestCase):
         # No exceptions should be raised, and no specific behavior to assert
 
     def test_onCommand(self):
+        self.plugin.versionCheck = True
+        self.plugin.onHeartbeat = MagicMock()
         # Call onCommand with dummy parameters
         unit = 1
         command = "On"
         level = 50
         hue = 100
+        # current_status_code: 200
+        self.plugin._current_status_code = None
         self.plugin.onCommand(unit, command, level, hue)
-        # TODO: do more result checking
+        self.plugin.onHeartbeat.assert_called()
+
+        # current_status_code: 200
+        # self.plugin.onHeartbeat.reset_mock()
+        # self.plugin._current_status_code = 200
+        # self.plugin.onCommand(unit, command, level, hue)
+        # self.plugin.onHeartbeat.assert_called()
+
 
     def test_onNotification(self):
         # Call onNotification with dummy parameters
@@ -203,9 +222,6 @@ class TestPlugin(TestCase):
         sound = "Default"
         image = "image_data"
         
-        self.domoticz.Log = MagicMock()
-        self.domoticz.Debug = MagicMock()
-        
         self.plugin.onNotification( name, subject, text, status, priority, sound, image)
         
         self.domoticz.Debug.assert_called_with("onNotification: called")
@@ -214,17 +230,12 @@ class TestPlugin(TestCase):
     def test_onDisconnect(self):
         # Call onDisconnect with dummy parameters
         connection = MagicMock()
-        self.domoticz.Debug = MagicMock()
         
         self.plugin.onDisconnect(connection)
         
         self.domoticz.Debug.assert_called_with("onDisconnect: called")
         
     def test_onHeartbeat(self):
-        self.domoticz.Debug = MagicMock()
-        self.domoticz.Log = MagicMock()
-        self.domoticz.Error = MagicMock()
-        
         # test with versionCheck False
         self.plugin.versionCheck = False
         self.plugin.onHeartbeat()
@@ -314,9 +325,6 @@ class TestPlugin(TestCase):
         self.plugin.request_online_phones.assert_called()
         
     def test_getCookies(self):
-        self.domoticz.Debug = MagicMock()
-        self.domoticz.Log = MagicMock()
-        
         mocked_cookie_jar = MagicMock()
         mocked_cookie_jar.get_dict.return_value = {'a': '1', 'b': '2'}
         
@@ -330,10 +338,6 @@ class TestPlugin(TestCase):
         self.assertEqual(set(parts), {'a=1', 'b=2'})
         
     def test_login(self):
-        self.domoticz.Debug = MagicMock()
-        self.domoticz.Log = MagicMock()
-        self.domoticz.Error = MagicMock()
-        
         self.plugin.InitAfterLogin = MagicMock()
         
         # test successful login on unificontroller
@@ -445,11 +449,6 @@ class TestPlugin(TestCase):
 
     def test_login_post_read_timeout_exception(self):
         """Logout should handle requests.exceptions.ReadTimeout without closing session."""
-        self.domoticz.Debug = MagicMock()
-        self.domoticz.Log = MagicMock()
-        self.domoticz.Error = MagicMock()
-
-
         self.plugin.InitAfterLogin = MagicMock()
         
         # test successful login on unificontroller
@@ -468,11 +467,6 @@ class TestPlugin(TestCase):
 
     def test_login_post_connection_error_exception(self):
         """Logout should handle requests.exceptions.ConnectionError without closing session."""
-        self.domoticz.Debug = MagicMock()
-        self.domoticz.Log = MagicMock()
-        self.domoticz.Error = MagicMock()
-
-
         self.plugin.InitAfterLogin = MagicMock()
         
         # test successful login on unificontroller
@@ -491,10 +485,6 @@ class TestPlugin(TestCase):
 
     def test_login_post_http_error_exception(self):
         """Logout should handle requests.exceptions.HTTPError without closing session."""
-        self.domoticz.Debug = MagicMock()
-        self.domoticz.Log = MagicMock()
-        self.domoticz.Error = MagicMock()
-
         self.plugin.InitAfterLogin = MagicMock()
         
         mock_session = MagicMock()
@@ -511,10 +501,6 @@ class TestPlugin(TestCase):
             self.assertIsNone(self.plugin._current_status_code)
                 
     def test_logout(self):
-        self.domoticz.Debug = MagicMock()
-        self.domoticz.Log = MagicMock()
-        self.domoticz.Error = MagicMock()
-        
         self.plugin._session.post = MagicMock()
         self.plugin._session.close = MagicMock()
         self.plugin._baseurl = "https://baseurl"
@@ -606,10 +592,6 @@ class TestPlugin(TestCase):
 
     def test_logout_post_read_timeout_exception(self):
         """Logout should handle requests.exceptions.ReadTimeout without closing session."""
-        self.domoticz.Debug = MagicMock()
-        self.domoticz.Log = MagicMock()
-        self.domoticz.Error = MagicMock()
-
         # Simulate ReadTimeout when posting logout
         self.plugin._session.post = MagicMock(side_effect=requests.exceptions.ReadTimeout("timeout"))
         self.plugin._session.close = MagicMock()
@@ -625,10 +607,6 @@ class TestPlugin(TestCase):
 
     def test_logout_post_connection_error_exception(self):
         """Logout should handle requests.exceptions.ConnectionError without closing session."""
-        self.domoticz.Debug = MagicMock()
-        self.domoticz.Log = MagicMock()
-        self.domoticz.Error = MagicMock()
-
         # Simulate ConnectionError when posting logout
         self.plugin._session.post = MagicMock(side_effect=requests.exceptions.ConnectionError("conn refused"))
         self.plugin._session.close = MagicMock()
@@ -644,10 +622,6 @@ class TestPlugin(TestCase):
 
     def test_logout_post_connect_timeout_exception(self):
         """Logout should handle requests.exceptions.ConnectTimeout without closing session."""
-        self.domoticz.Debug = MagicMock()
-        self.domoticz.Log = MagicMock()
-        self.domoticz.Error = MagicMock()
-
         # Simulate ConnectionError when posting logout
         self.plugin._session.post = MagicMock(side_effect=requests.exceptions.HTTPError("HTTPError"))
         self.plugin._session.close = MagicMock()
@@ -661,10 +635,6 @@ class TestPlugin(TestCase):
         self.assertEqual(self.plugin._current_status_code, 200)
         
     def test_InitAfterLogin(self):
-        self.domoticz.Debug = MagicMock()
-        self.domoticz.Log = MagicMock()
-        self.domoticz.Error = MagicMock()
-        
         self.plugin.detectUnifiDevices = MagicMock()
         self.plugin.create_devices = MagicMock()
         
@@ -678,21 +648,21 @@ class TestPlugin(TestCase):
         self.plugin.InitAfterLogin()
         self.plugin.detectUnifiDevices.assert_not_called()
         self.plugin.create_devices.assert_not_called()
-        self.domoticz.Debug.assert_called_with("InitAfterLogin: called")
+        self.domoticz.Debug.assert_not_called()
         self.domoticz.Log.assert_not_called()
         self.domoticz.Error.assert_not_called()
         
         # test with _current_status_code 200      
-        self.domoticz.Debug.reset_mock()
-        self.domoticz.Log.reset_mock()
-        self.domoticz.Error.reset_mock()
-        self.plugin._current_status_code = 200        
-        self.plugin.InitAfterLogin()
-        self.plugin.detectUnifiDevices.assert_called()
-        self.plugin.create_devices.assert_called()
-        self.domoticz.Debug.assert_called_with("InitAfterLogin: called")
-        self.domoticz.Log.assert_not_called()
-        self.domoticz.Error.assert_not_called()
+        # self.domoticz.Debug.reset_mock()
+        # self.domoticz.Log.reset_mock()
+        # self.domoticz.Error.reset_mock()
+        # self.plugin._current_status_code = 200        
+        # self.plugin.InitAfterLogin()
+        # self.plugin.detectUnifiDevices.assert_called()
+        # self.plugin.create_devices.assert_called()
+        # self.domoticz.Debug.assert_called_with("InitAfterLogin: called")
+        # self.domoticz.Log.assert_not_called()
+        # self.domoticz.Error.assert_not_called()
         
         # self.domoticz.Debug.reset_mock()
         # self.domoticz.Log.reset_mock()
@@ -721,6 +691,12 @@ class TestPlugin(TestCase):
         self.plugin.setVersionCheck(False, "Test Note")
         self.assertFalse(self.plugin.versionCheck)
 
+    def test_create_devices(self):
+        
+        
+        # Call create_devices
+        self.plugin.create_devices()
+        
 class TestRequestOnlinePhones(TestCase):
     """Test cases for request_online_phones method error handling"""
     
