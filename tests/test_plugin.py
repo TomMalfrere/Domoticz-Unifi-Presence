@@ -51,8 +51,12 @@ class TestPlugin(TestCase):
         self.domoticz = MagicMock()
         plugin_module.Domoticz = self.domoticz
 
-        # Ensure Images dict exists
-        plugin_module.Images = {}
+        # Ensure Images and Devices dicts exist and use fakeDomoticz ones
+        plugin_module.Images = fakeDomoticz.Images
+        plugin_module.Devices = fakeDomoticz.Devices
+
+        # Make Domoticz.Image call fakeDomoticz.Image
+        self.domoticz.Image.side_effect = lambda zip: fakeDomoticz.Image(zip)
 
         # Provide Devices entries for Off Delay (2) and Update Log (3)
         devices = {2: SimpleNamespace(nValue=10),
@@ -81,25 +85,64 @@ class TestPlugin(TestCase):
     def test_onStart(self):
         self.plugin.login = MagicMock()
         self.domoticz.Heartbeat = MagicMock()
+        plugin_module.Devices[self.plugin.UNIFI_OFF_DELAY] = MagicMock()
+        plugin_module.Devices[self.plugin.UNIFI_OFF_DELAY].nValue = 10
+        plugin_module.Devices[self.plugin.UNIFI_UPDATE_LOG] = MagicMock()
+        plugin_module.Devices[self.plugin.UNIFI_UPDATE_LOG].sValue = "On"
 
-        # Call onStart and verify expected behavior
         self.plugin.onStart()
 
-        # login should be called
         self.plugin.login.assert_called()
-
-        # Off delay should be set from Devices[2].nValue + 20
         self.assertEqual(self.plugin._Off_Delay, 10 + 20)
-
-        # _log_devices should be False because Devices[3].sValue == "Off"
-        self.assertFalse(self.plugin._log_devices)
-
-        # Heartbeat should have been requested
+        self.assertEqual(self.plugin._log_devices, True)
+        self.assertEqual(self.plugin.versionCheck, True)
         self.domoticz.Heartbeat.assert_called_with(5)
-
-        # devicetable file should have been created
         self.assertTrue(os.path.isfile(os.path.join(self.path_homefolder, "devicetable.txt")))
 
+        self.plugin.login.reset_mock()
+        self.domoticz.Heartbeat.reset_mock()
+        plugin_module.Parameters["Mode6"] = "20"
+        plugin_module.Devices[self.plugin.UNIFI_OFF_DELAY] = MagicMock()
+        plugin_module.Devices[self.plugin.UNIFI_OFF_DELAY].nValue = 0
+        plugin_module.Devices[self.plugin.UNIFI_UPDATE_LOG] = MagicMock()
+        plugin_module.Devices[self.plugin.UNIFI_UPDATE_LOG].sValue = "Off"
+
+        self.plugin.onStart()
+
+        self.plugin.login.assert_called()
+        self.assertEqual(self.plugin._Off_Delay, 0)
+        self.assertEqual(self.plugin._log_devices, False)
+        self.assertEqual(self.plugin.versionCheck, True)
+        self.domoticz.Heartbeat.assert_called_with(5)
+        self.assertTrue(os.path.isfile(os.path.join(self.path_homefolder, "devicetable.txt")))
+
+    def test_onStart_on_old_domoticz(self):
+        self.plugin.login = MagicMock()
+        self.domoticz.Heartbeat = MagicMock()
+        plugin_module.Parameters["DomoticzVersion"] = "2019.1"
+
+        self.plugin.onStart()
+
+        self.plugin.login.assert_not_called()
+        self.assertEqual(self.plugin._Off_Delay, 60)
+        self.assertFalse(self.plugin._log_devices)
+        self.assertEqual(self.plugin.versionCheck, False)
+        self.domoticz.Heartbeat.assert_not_called()
+        self.assertFalse(os.path.isfile(os.path.join(self.path_homefolder, "devicetable.txt")))
+
+    def test_onStart_with_exception(self):
+        self.plugin.login = MagicMock()
+        self.domoticz.Heartbeat = MagicMock()
+        plugin_module.Parameters["DomoticzVersion"] = ""
+        
+        self.plugin.onStart()
+
+        self.plugin.login.assert_not_called()
+        self.assertEqual(self.plugin._Off_Delay, 60)
+        self.assertFalse(self.plugin._log_devices)
+        self.assertEqual(self.plugin.versionCheck, False)
+        self.domoticz.Heartbeat.assert_not_called()
+        self.assertFalse(os.path.isfile(os.path.join(self.path_homefolder, "devicetable.txt")))
 
     def test_onStop(self):
         self.plugin.logout = MagicMock()
