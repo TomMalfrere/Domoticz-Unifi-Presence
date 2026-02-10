@@ -50,13 +50,23 @@ class X:
         pass
 
 
-    def Update(self, nValue:str,  sValue:str=None, Name:str=None,alarmData:str=None, Description:str=None,  Image=None):
+    def Update(self, 
+               nValue:str,  
+               sValue:str=None, 
+               Name:str=None,
+               alarmData:str=None, 
+               Description:str=None,  
+               Image=None):
         #self.level = alarmLevel
-        self.Name = Name
-        self.Description =Description
+        if Name is not None:
+            self.Name = Name
+        if Description is not None:
+            self.Description = Description
         self.nValue=nValue
-        self.sValue=sValue
-        self.Image = Image
+        if sValue is not None:
+            self.sValue=sValue
+        if Image is not None:
+            self.Image = Image
         pass
 
 def Image(sZip:str):
@@ -73,7 +83,7 @@ def Image(sZip:str):
     return img
 
 
-def Device(Name:str=None, Unit:str=None, TypeName:str=None, Used:bool=1, Switchtype:int=18, DeviceID:str=None, Options:str=None, **kwargs):
+def Device(Name:str, Unit:str=None, TypeName:str=None, Used:bool=1, Switchtype:int=18, DeviceID:str=None, Options:str=None, **kwargs):
     x = X(Unit or Name, Name=Name, Unit=Unit, DeviceID=DeviceID, TypeName=TypeName, Used=Used, Switchtype=Switchtype, Options=Options, **kwargs)
     return x
 
