@@ -72,6 +72,24 @@ class TestUpdateDevice(TestCase):
         except KeyError:
             self.fail("UpdateDevice should not raise KeyError for nonexistent device")
     
+    def test_update_device_with_image(self):
+        """Test UpdateDevice can update device with new image"""
+        # Create a test device
+        test_device = fakeDomoticz.Device(Name="TestDeviceWithImage", Unit=6)
+        test_device.Create()
+        test_device.nValue = 0
+        test_device.sValue = "Off"
+        
+        # Mock an image
+        fake_image = "fake_image.zip"
+        fakeDomoticz.Image(fake_image)  # This will create an image in the fake environment
+        
+        # Update device with new image
+        plugin.UpdateDevice(6, 0, "Off", Image=fake_image)
+        
+        # Verify the image was updated
+        self.assertEqual(plugin.Devices[6].Image, fake_image)
+        
     def test_update_device_with_multiple_changes(self):
         """Test UpdateDevice with nValue and sValue both changing"""
         # Create a test device

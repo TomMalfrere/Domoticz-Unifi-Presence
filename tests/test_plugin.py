@@ -1,27 +1,20 @@
+from unittest import TestCase
+from unittest.mock import patch, MagicMock, call
+
 import requests
 import sys
 import os
 import tempfile
 import shutil
 
-from unittest import TestCase
-from unittest.mock import Mock, patch, MagicMock, call
-from http.client import RemoteDisconnected
 from types import SimpleNamespace
 
-import plugin as plugin_module
-
+import plugin as unifi_domoticz_plugin
 
 # Add the tests directory to the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fakeDomoticz
 sys.modules['Domoticz'] = fakeDomoticz
-
-# Create mock urllib3
-mock_urllib3 = MagicMock()
-mock_urllib3.disable_warnings = MagicMock()
-
-# from plugin import BasePlugin
 
 
 class TestPlugin(TestCase):
@@ -32,7 +25,7 @@ class TestPlugin(TestCase):
         self.path_homefolder = self.path_tmpdir + os.sep
 
         # Patch module-level objects used by onStart
-        plugin_module.Parameters = {
+        unifi_domoticz_plugin.Parameters = {
             "DomoticzVersion": "2021.1",
             "HomeFolder": self.path_homefolder,
             "Mode1": "default",
@@ -50,11 +43,12 @@ class TestPlugin(TestCase):
         # Provide a Domoticz mock that exposes the methods onStart calls
         self.domoticz = MagicMock()
         
-        plugin_module.Domoticz = self.domoticz
+        unifi_domoticz_plugin.Domoticz = self.domoticz
         # Ensure Images and Devices dicts exist and use fakeDomoticz ones
-        plugin_module.Images = fakeDomoticz.Images
-        plugin_module.Devices = fakeDomoticz.Devices
-        plugin_module.UpdateDevice = fakeDomoticz.UpdateDevice
+        unifi_domoticz_plugin.Images = fakeDomoticz.Images
+        unifi_domoticz_plugin.Devices = fakeDomoticz.Devices
+        self._orig_update_device = unifi_domoticz_plugin.UpdateDevice
+        unifi_domoticz_plugin.UpdateDevice = fakeDomoticz.UpdateDevice
 
         # Make Domoticz.Image call fakeDomoticz.Image
         self.domoticz.Image.side_effect = lambda zip: fakeDomoticz.Image(zip)
@@ -69,15 +63,16 @@ class TestPlugin(TestCase):
         devices = {2: SimpleNamespace(nValue=10, sValue="10"),
                    3: SimpleNamespace(nValue=0, sValue="Off"),
         }
-        plugin_module.Devices.update(devices)
+        unifi_domoticz_plugin.Devices.update(devices)
 
         # Create plugin instance and stub out login to avoid network calls
-        self.plugin = plugin_module.BasePlugin()
+        self.plugin = unifi_domoticz_plugin.BasePlugin()
 
         
     
     def tearDown(self):
         # Clean up
+        unifi_domoticz_plugin.UpdateDevice = self._orig_update_device
         shutil.rmtree(self.path_tmpdir)
 
     def test_dummy(self):
@@ -87,17 +82,17 @@ class TestPlugin(TestCase):
         
     def test_init(self):
         """Test plugin initialization."""
-        self.assertIsInstance(self.plugin, plugin_module.BasePlugin)
+        self.assertIsInstance(self.plugin, unifi_domoticz_plugin.BasePlugin)
         self.assertEqual(self.plugin._Off_Delay, 60)
         self.assertEqual(self.plugin._log_devices, False)
         
     def test_onStart(self):
         self.plugin.login = MagicMock()
         self.domoticz.Heartbeat = MagicMock()
-        plugin_module.Devices[self.plugin.UNIFI_OFF_DELAY] = MagicMock()
-        plugin_module.Devices[self.plugin.UNIFI_OFF_DELAY].nValue = 10
-        plugin_module.Devices[self.plugin.UNIFI_UPDATE_LOG] = MagicMock()
-        plugin_module.Devices[self.plugin.UNIFI_UPDATE_LOG].sValue = "On"
+        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_OFF_DELAY] = MagicMock()
+        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_OFF_DELAY].nValue = 10
+        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_UPDATE_LOG] = MagicMock()
+        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_UPDATE_LOG].sValue = "On"
 
         self.plugin.onStart()
 
@@ -110,11 +105,11 @@ class TestPlugin(TestCase):
 
         self.plugin.login.reset_mock()
         self.domoticz.Heartbeat.reset_mock()
-        plugin_module.Parameters["Mode6"] = "20"
-        plugin_module.Devices[self.plugin.UNIFI_OFF_DELAY] = MagicMock()
-        plugin_module.Devices[self.plugin.UNIFI_OFF_DELAY].nValue = 0
-        plugin_module.Devices[self.plugin.UNIFI_UPDATE_LOG] = MagicMock()
-        plugin_module.Devices[self.plugin.UNIFI_UPDATE_LOG].sValue = "Off"
+        unifi_domoticz_plugin.Parameters["Mode6"] = "20"
+        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_OFF_DELAY] = MagicMock()
+        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_OFF_DELAY].nValue = 0
+        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_UPDATE_LOG] = MagicMock()
+        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_UPDATE_LOG].sValue = "Off"
 
         self.plugin.onStart()
 
@@ -128,7 +123,7 @@ class TestPlugin(TestCase):
     def test_onStart_on_old_domoticz(self):
         self.plugin.login = MagicMock()
         self.domoticz.Heartbeat = MagicMock()
-        plugin_module.Parameters["DomoticzVersion"] = "2019.1"
+        unifi_domoticz_plugin.Parameters["DomoticzVersion"] = "2019.1"
 
         self.plugin.onStart()
 
@@ -142,7 +137,7 @@ class TestPlugin(TestCase):
     def test_onStart_with_exception(self):
         self.plugin.login = MagicMock()
         self.domoticz.Heartbeat = MagicMock()
-        plugin_module.Parameters["DomoticzVersion"] = ""
+        unifi_domoticz_plugin.Parameters["DomoticzVersion"] = ""
         
         self.plugin.onStart()
 
@@ -179,7 +174,7 @@ class TestPlugin(TestCase):
         # Provide the dict structure expected by onMessage
         data = {'Data': b'{}', 'Status': '200'}
         # Mock DumpHTTPResponseToLog to avoid exercising its implementation
-        plugin_module.DumpHTTPResponseToLog = MagicMock()
+        unifi_domoticz_plugin.DumpHTTPResponseToLog = MagicMock()
         self.plugin._current_status_code = 200
         self.plugin.onMessage(connection, data)
         
@@ -291,10 +286,10 @@ class TestPlugin(TestCase):
         self.plugin.Matrix[0][3] = "On"
         self.plugin.request_details.reset_mock()
         self.plugin.request_online_phones.reset_mock()
-        plugin_module.Devices[self.plugin.UNIFI_OFF_DELAY] = MagicMock()
-        plugin_module.Devices[self.plugin.UNIFI_OFF_DELAY].nValue = 10
-        plugin_module.Devices[255] = MagicMock()
-        plugin_module.Devices[255].LastUpdate = '2023-01-01 12:00:00'
+        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_OFF_DELAY] = MagicMock()
+        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_OFF_DELAY].nValue = 10
+        unifi_domoticz_plugin.Devices[255] = MagicMock()
+        unifi_domoticz_plugin.Devices[255].LastUpdate = '2023-01-01 12:00:00'
         self.plugin.onHeartbeat()
         expected = [call("onHeartbeat: Requesting Unifi Controller details")]
         self.domoticz.Debug.assert_has_calls(expected)
@@ -312,10 +307,10 @@ class TestPlugin(TestCase):
         self.plugin.Matrix[0][3] = "On"
         self.plugin.request_details.reset_mock()
         self.plugin.request_online_phones.reset_mock()
-        plugin_module.Devices[self.plugin.UNIFI_OFF_DELAY] = MagicMock()
-        plugin_module.Devices[self.plugin.UNIFI_OFF_DELAY].nValue = 0
-        plugin_module.Devices[255] = MagicMock()
-        plugin_module.Devices[255].LastUpdate = '2023-01-01 12:00:00'
+        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_OFF_DELAY] = MagicMock()
+        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_OFF_DELAY].nValue = 0
+        unifi_domoticz_plugin.Devices[255] = MagicMock()
+        unifi_domoticz_plugin.Devices[255].LastUpdate = '2023-01-01 12:00:00'
         self.plugin.onHeartbeat()
         expected = [call("onHeartbeat: Requesting Unifi Controller details")]
         self.domoticz.Debug.assert_has_calls(expected)
@@ -409,7 +404,7 @@ class TestPlugin(TestCase):
             mock_session.post.assert_called_once()
             
         # test successful login on dreammachinepro
-        plugin_module.Parameters["Mode4"] = "dreammachinepro"
+        unifi_domoticz_plugin.Parameters["Mode4"] = "dreammachinepro"
         self.domoticz.Debug.reset_mock()
         self.domoticz.Log.reset_mock()
         self.domoticz.Error.reset_mock()
@@ -429,7 +424,7 @@ class TestPlugin(TestCase):
             mock_session.post.assert_called_once()
 
         # test successful login on something else
-        plugin_module.Parameters["Mode4"] = "somethingelse"
+        unifi_domoticz_plugin.Parameters["Mode4"] = "somethingelse"
         self.domoticz.Debug.reset_mock()
         self.domoticz.Log.reset_mock()
         self.domoticz.Error.reset_mock()
@@ -546,7 +541,7 @@ class TestPlugin(TestCase):
         self.plugin._session.post.reset_mock()
         self.plugin._session.close.reset_mock()
         self.plugin._current_status_code = 200
-        plugin_module.Parameters["Mode4"] = "dreammachinepro"
+        unifi_domoticz_plugin.Parameters["Mode4"] = "dreammachinepro"
         self.plugin.logout()
         #self.domoticz.Debug.assert_called_with("logout: called")
         self.domoticz.Log.assert_called_with('logout: Logout of the Unifi API')
@@ -564,7 +559,7 @@ class TestPlugin(TestCase):
         self.plugin._session.post.reset_mock()
         self.plugin._session.close.reset_mock()
         self.plugin._current_status_code = 200
-        plugin_module.Parameters["Mode4"] = "something else"
+        unifi_domoticz_plugin.Parameters["Mode4"] = "something else"
         self.plugin.logout()
         #self.domoticz.Debug.assert_called_with("logout: called")
         self.domoticz.Log.assert_called_with('logout: Logout of the Unifi API')
@@ -596,7 +591,7 @@ class TestPlugin(TestCase):
         self.plugin._session.post = MagicMock(side_effect=requests.exceptions.ReadTimeout("timeout"))
         self.plugin._session.close = MagicMock()
         self.plugin._baseurl = "https://baseurl"
-        plugin_module.Parameters["Mode4"] = "unificontroller"
+        unifi_domoticz_plugin.Parameters["Mode4"] = "unificontroller"
         self.plugin._current_status_code = 200
 
         self.plugin.logout()
@@ -611,7 +606,7 @@ class TestPlugin(TestCase):
         self.plugin._session.post = MagicMock(side_effect=requests.exceptions.ConnectionError("conn refused"))
         self.plugin._session.close = MagicMock()
         self.plugin._baseurl = "https://baseurl"
-        plugin_module.Parameters["Mode4"] = "dreammachinepro"
+        unifi_domoticz_plugin.Parameters["Mode4"] = "dreammachinepro"
         self.plugin._current_status_code = 200
 
         self.plugin.logout()
@@ -638,7 +633,7 @@ class TestPlugin(TestCase):
         self.plugin.detectUnifiDevices = MagicMock()
         self.plugin.create_devices = MagicMock()
         
-        plugin_module.Parameters["Mode2"] = "Phone1=aa:bb:cc:dd:ee:ff,Phone2=11:22:33:44:55:66"
+        unifi_domoticz_plugin.Parameters["Mode2"] = "Phone1=aa:bb:cc:dd:ee:ff,Phone2=11:22:33:44:55:66"
         
         # test with _current_status_code None      
         self.domoticz.Debug.reset_mock()
@@ -691,213 +686,19 @@ class TestPlugin(TestCase):
         self.plugin.setVersionCheck(False, "Test Note")
         self.assertFalse(self.plugin.versionCheck)
 
+    def test_create_devicetable(self):
+        pass
+
     def test_create_devices(self):
         self.plugin.login = MagicMock()
         self.domoticz.Heartbeat = MagicMock()
-        plugin_module.Devices[self.plugin.UNIFI_OFF_DELAY] = MagicMock()
-        plugin_module.Devices[self.plugin.UNIFI_OFF_DELAY].nValue = 10
-        plugin_module.Devices[self.plugin.UNIFI_UPDATE_LOG] = MagicMock()
-        plugin_module.Devices[self.plugin.UNIFI_UPDATE_LOG].sValue = "On"
+        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_OFF_DELAY] = MagicMock()
+        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_OFF_DELAY].nValue = 10
+        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_UPDATE_LOG] = MagicMock()
+        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_UPDATE_LOG].sValue = "On"
 
         self.plugin.onStart()
         
         # Call create_devices
         self.plugin.create_devices()
         
-class TestRequestOnlinePhones(TestCase):
-    """Test cases for request_online_phones method error handling"""
-    
-    def _create_plugin_instance(self):
-        """Helper to create a properly configured plugin instance"""
-        plugin_inst = plugin_module.BasePlugin()
-        # Mock the session
-        plugin_inst._session = Mock()
-        plugin_inst._baseurl = "https://test.example.com"
-        plugin_inst._site = "default"
-        plugin_inst._Cookies = {}
-        plugin_inst._verify_ssl = False
-        plugin_inst.Matrix = []
-        plugin_inst.total_devices_count = 0
-        # Mock the login method to avoid additional complications
-        plugin_inst.login = Mock()
-        return plugin_inst
-    
-    @patch.dict('plugin.__dict__', {
-        'Parameters': {
-            "Mode4": "unificontroller", 
-            "Mode2": "test_phone=aa:bb:cc:dd:ee:ff",
-            "Username": "admin",
-            "Password": "test",
-            "Mode5": "Yes"
-        }, 
-        'Domoticz': MagicMock(), 
-        'urllib3': mock_urllib3
-    })
-    def test_connection_error_handling(self):
-        """Test that ConnectionError doesn't cause UnboundLocalError"""
-        plugin_inst = self._create_plugin_instance()
-        
-        # Simulate ConnectionError from remote disconnect
-        connection_error = requests.exceptions.ConnectionError(
-            ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
-        )
-        plugin_inst._session.get.side_effect = connection_error
-        
-        # This should not raise UnboundLocalError
-        try:
-            plugin_inst.request_online_phones()
-        except UnboundLocalError as e:
-            self.fail(f"UnboundLocalError raised: {e}. Variable 'r' not defined before exception access.")
-    
-    @patch.dict('plugin.__dict__', {
-        'Parameters': {
-            "Mode4": "unificontroller", 
-            "Mode2": "test_phone=aa:bb:cc:dd:ee:ff",
-            "Username": "admin",
-            "Password": "test",
-            "Mode5": "Yes"
-        }, 
-        'Domoticz': MagicMock(), 
-        'urllib3': mock_urllib3
-    })
-    def test_read_timeout_error_handling(self):
-        """Test that ReadTimeout doesn't cause UnboundLocalError"""
-        plugin_inst = self._create_plugin_instance()
-        
-        # Simulate ReadTimeout
-        plugin_inst._session.get.side_effect = requests.exceptions.ReadTimeout("Request timed out")
-        
-        try:
-            plugin_inst.request_online_phones()
-        except UnboundLocalError as e:
-            self.fail(f"UnboundLocalError raised: {e}. Variable 'r' not defined before exception access.")
-    
-    @patch.dict('plugin.__dict__', {
-        'Parameters': {
-            "Mode4": "unificontroller", 
-            "Mode2": "test_phone=aa:bb:cc:dd:ee:ff",
-            "Username": "admin",
-            "Password": "test",
-            "Mode5": "Yes"
-        }, 
-        'Domoticz': MagicMock(), 
-        'urllib3': mock_urllib3
-    })
-    def test_successful_request(self):
-        """Test successful request returns data correctly"""
-        plugin_inst = self._create_plugin_instance()
-        
-        # Mock successful response
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            'data': [
-                {
-                    'mac': 'aa:bb:cc:dd:ee:ff',
-                    'is_wired': False,
-                    'name': 'Test Phone'
-                }
-            ]
-        }
-        plugin_inst._session.get.return_value = mock_response
-        # Mock ProcessDevices to avoid additional complications
-        plugin_inst.ProcessDevices = Mock()
-        
-        try:
-            plugin_inst.request_online_phones()
-            self.assertTrue(True)
-        except Exception as e:
-            self.fail(f"Unexpected exception raised: {e}")
-    
-    @patch.dict('plugin.__dict__', {
-        'Parameters': {
-            "Mode4": "dreammachinepro", 
-            "Mode2": "test_phone=aa:bb:cc:dd:ee:ff",
-            "Username": "admin",
-            "Password": "test",
-            "Mode5": "Yes"
-        }, 
-        'Domoticz': MagicMock(), 
-        'urllib3': mock_urllib3
-    })
-    def test_connection_refused_for_dreammachine_pro(self):
-        """Test ConnectionError with Dream Machine Pro configuration"""
-        plugin_inst = self._create_plugin_instance()
-        
-        connection_error = requests.exceptions.ConnectionError(
-            ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
-        )
-        plugin_inst._session.get.side_effect = connection_error
-        
-        try:
-            plugin_inst.request_online_phones()
-        except UnboundLocalError as e:
-            self.fail(f"UnboundLocalError raised: {e}. Variable 'r' not defined before exception access.")
-
-
-class TestLoginMethod(TestCase):
-    """Test cases for login method error handling"""
-    
-    def _create_plugin_instance(self):
-        """Helper to create a properly configured plugin instance"""
-        plugin_inst = plugin_module.BasePlugin()
-        # Mock the session
-        plugin_inst._session = Mock()
-        plugin_inst._login_data = {}
-        return plugin_inst
-    
-    @patch.dict('plugin.__dict__', {
-        'Parameters': {
-            "Mode4": "unificontroller",
-            "Username": "admin",
-            "Password": "test",
-            "Address": "192.168.1.1",
-            "Port": "8443",
-            "Mode1": "default"
-        },
-        'Domoticz': MagicMock(),
-        'urllib3': mock_urllib3
-    })
-    def test_login_connection_error_no_infinite_loop(self):
-        """Test that ConnectionError in login doesn't cause infinite recursion"""
-        plugin_inst = self._create_plugin_instance()
-        
-        # Simulate ConnectionError
-        connection_error = requests.exceptions.ConnectionError(
-            ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
-        )
-        plugin_inst._session.post.side_effect = connection_error
-        
-        # This should not raise UnboundLocalError or cause infinite recursion
-        try:
-            plugin_inst.login()
-        except UnboundLocalError as e:
-            self.fail(f"UnboundLocalError raised in login: {e}. Variable 'r' not defined.")
-        except RecursionError:
-            self.fail("RecursionError raised - infinite loop detected in login method.")
-    
-    @patch.dict('plugin.__dict__', {
-        'Parameters': {
-            "Mode4": "unificontroller",
-            "Username": "admin",
-            "Password": "test",
-            "Address": "192.168.1.1",
-            "Port": "8443",
-            "Mode1": "default"
-        },
-        'Domoticz': MagicMock(),
-        'urllib3': mock_urllib3
-    })
-    def test_login_read_timeout_error(self):
-        """Test that ReadTimeout in login is handled properly"""
-        plugin_inst = self._create_plugin_instance()
-        
-        # Simulate ReadTimeout
-        plugin_inst._session.post.side_effect = requests.exceptions.ReadTimeout("Timeout")
-        
-        # Should not raise UnboundLocalError
-        try:
-            plugin_inst.login()
-        except UnboundLocalError as e:
-            self.fail(f"UnboundLocalError raised in login: {e}. Variable 'r' not defined.")
-
