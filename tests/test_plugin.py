@@ -56,6 +56,8 @@ class TestPlugin(TestCase):
         # Ensure Images and Devices dicts exist and use fakeDomoticz ones
         unifi_domoticz_plugin.Images = fakeDomoticz.Images
         unifi_domoticz_plugin.Devices = fakeDomoticz.Devices
+        unifi_domoticz_plugin.Images.clear()
+        unifi_domoticz_plugin.Devices.clear()
         self._orig_update_device = unifi_domoticz_plugin.UpdateDevice       # Save original UpdateDevice to restore later
         unifi_domoticz_plugin.UpdateDevice = fakeDomoticz.UpdateDevice      # Use fake UpdateDevice to avoid side effects during tests
 
@@ -200,15 +202,15 @@ class TestPlugin(TestCase):
     def test_onCommand(self):
         self.plugin.versionCheck = True
         self.plugin.onHeartbeat = MagicMock()
+        
+        # Test with current_status_code: None
+        self.plugin._current_status_code = None
+        
         # Call onCommand with dummy parameters
         unit = 1
         command = "On"
         level = 50
         hue = 100
-        
-        # Test with current_status_code: None
-        self.plugin._current_status_code = None
-        
         self.plugin.onCommand(unit, command, level, hue)
         
         self.plugin.onHeartbeat.assert_called()
@@ -216,13 +218,142 @@ class TestPlugin(TestCase):
         # current_status_code: 200
         self.plugin.onHeartbeat.reset_mock()
         
-        # Clear Images and Devices so _onStart_mocked() assertions pass
-        unifi_domoticz_plugin.Images.clear()
-        unifi_domoticz_plugin.Devices.clear()
+        self._onStart_mocked()
+
+        # Mock UpdateDevice to track calls
+        mock_update_device = MagicMock()
+        unifi_domoticz_plugin.UpdateDevice = mock_update_device
+        self.plugin.block_phone = MagicMock()
+        self.plugin.unblock_phone = MagicMock()
+
+        # Call onCommand UNIFII_OVERRIDE_UNIT with level 0      
+        unit = self.plugin.UNIFI_OVERRIDE_UNIT
+        command = "On"
+        level = 0
+        hue = 100 #not used in onCommand but required parameter
+        self.plugin.onCommand(unit, command, level, hue)
+        self.assertEqual(self.plugin.override_time, 0)
+        self.assertEqual(self.plugin.Matrix[0][3], "Off")
+        self.assertEqual(self.plugin.Matrix[0][5], "No")
+        mock_update_device.assert_called_with(self.plugin.UNIFI_OVERRIDE_UNIT, 0, "0")
+       
+        # Call onCommand UNIFII_OVERRIDE_UNIT with level 10      
+        unit = self.plugin.UNIFI_OVERRIDE_UNIT
+        command = "On"
+        level = 10
+        hue = 100 #not used in onCommand but required parameter
+        self.plugin.onCommand(unit, command, level, hue)
+        self.assertEqual(self.plugin.override_time, 3600)
+        self.assertEqual(self.plugin.Matrix[0][3], "On")
+        self.assertEqual(self.plugin.Matrix[0][5], "OverRide")
+        mock_update_device.assert_called_with(self.plugin.UNIFI_OVERRIDE_UNIT, 10, "10")
+       
+        # Call onCommand UNIFII_OVERRIDE_UNIT with level 20      
+        unit = self.plugin.UNIFI_OVERRIDE_UNIT
+        command = "On"
+        level = 20
+        hue = 100 #not used in onCommand but required parameter
+        self.plugin.onCommand(unit, command, level, hue)
+        self.assertEqual(self.plugin.override_time, 7200)
+        self.assertEqual(self.plugin.Matrix[0][3], "On")
+        self.assertEqual(self.plugin.Matrix[0][5], "OverRide")
+        mock_update_device.assert_called_with(self.plugin.UNIFI_OVERRIDE_UNIT, 20, "20")
+       
+        # Call onCommand UNIFII_OVERRIDE_UNIT with level 30      
+        unit = self.plugin.UNIFI_OVERRIDE_UNIT
+        command = "On"
+        level = 30
+        hue = 100 #not used in onCommand but required parameter
+        self.plugin.onCommand(unit, command, level, hue)
+        self.assertEqual(self.plugin.override_time, 10800)
+        self.assertEqual(self.plugin.Matrix[0][3], "On")
+        self.assertEqual(self.plugin.Matrix[0][5], "OverRide")
+        mock_update_device.assert_called_with(self.plugin.UNIFI_OVERRIDE_UNIT, 30, "30")
+       
+        # Call onCommand UNIFII_OVERRIDE_UNIT with level 40      
+        unit = self.plugin.UNIFI_OVERRIDE_UNIT
+        command = "On"
+        level = 40
+        hue = 100 #not used in onCommand but required parameter
+        self.plugin.onCommand(unit, command, level, hue)
+        self.assertEqual(self.plugin.override_time, 99999999999)
+        self.assertEqual(self.plugin.Matrix[0][3], "On")
+        self.assertEqual(self.plugin.Matrix[0][5], "OverRide")
+        mock_update_device.assert_called_with(self.plugin.UNIFI_OVERRIDE_UNIT, 40, "40")
+       
+        # Call onCommand UNIFII_OVERRIDE_UNIT with level 40      
+        unit = self.plugin.UNIFI_OFF_DELAY
+        command = "On"
+        level = 15
+        hue = 100 #not used in onCommand but required parameter
+        self.plugin.onCommand(unit, command, level, hue)
+        self.assertEqual(self.plugin._Off_Delay, 35)
+        mock_update_device.assert_called_with(self.plugin.UNIFI_OFF_DELAY, 15, "15")
+
+        # Call onCommand UNIFII_OVERRIDE_UNIT with level 40      
+        unit = self.plugin.UNIFI_UPDATE_LOG
+        level = 0
+        hue = 100 #not used in onCommand but required parameter
+        command = "On"
+        self.plugin.onCommand(unit, command, level, hue)
+        self.assertEqual(self.plugin._log_devices, True)
+        mock_update_device.assert_called_with(self.plugin.UNIFI_UPDATE_LOG, 1, "On")
+        command = "Off"
+        self.plugin.onCommand(unit, command, level, hue)
+        self.assertEqual(self.plugin._log_devices, False)
+        mock_update_device.assert_called_with(self.plugin.UNIFI_UPDATE_LOG, 0, "Off")
+       
+        # Call onCommand unit==0 with level 10
+        unit = 0
+        level = 10
+        hue = 100 #not used in onCommand but required parameter
+        command = "On"
+        unifi_domoticz_plugin.Parameters["Mode5"] = "Yes"
+        self.plugin.onCommand(unit, command, level, hue)
+        self.assertEqual(self.plugin.Matrix[1][3], "Off")
+        self.assertEqual(self.plugin.Matrix[1][4], "No")
+        self.assertEqual(self.plugin.Matrix[1][5], "No")
+        mock_update_device.assert_called_with(unit, 10, "10")
+        self.plugin.block_phone.assert_called_with("Phone1", "aa:bb:cc:dd:ee:ff")
+       
+        # Call onCommand unit==0 with level 20
+        unit = 0
+        level = 20
+        hue = 100 #not used in onCommand but required parameter
+        command = "On"
+        unifi_domoticz_plugin.Parameters["Mode5"] = "Yes"
+        self.plugin.onCommand(unit, command, level, hue)
+        self.assertEqual(self.plugin.Matrix[1][3], "Off")
+        self.assertEqual(self.plugin.Matrix[1][4], "Yes")
+        self.assertEqual(self.plugin.Matrix[1][5], "No")
+        mock_update_device.assert_called_with(unit, 20, "20")
+        self.plugin.unblock_phone.assert_called_with("Phone1", "aa:bb:cc:dd:ee:ff", unit)
+
+        self.plugin.onHeartbeat.assert_called()
+
+    def test_onCommand_with_geo_fencing(self):
+        self.plugin.versionCheck = True
+        unifi_domoticz_plugin.Parameters["Mode3"] = "Yes"
+        self.plugin.onHeartbeat = MagicMock()
         
         self._onStart_mocked()
-       
+        mock_update_device = MagicMock()    # Mock UpdateDevice to track calls
+        unifi_domoticz_plugin.UpdateDevice = mock_update_device
+        self.plugin.block_phone = MagicMock()
+        self.plugin.unblock_phone = MagicMock()
+        unit = 0
+        level = 10
+        hue = 100 #not used in onCommand but required parameter
+        
+        command = "On"
         self.plugin.onCommand(unit, command, level, hue)
+        self.assertEqual(self.plugin.Matrix[1][3], command)
+        mock_update_device.assert_called_with(unit, 1, command)
+        
+        command = "Off"
+        self.plugin.onCommand(unit, command, level, hue)
+        self.assertEqual(self.plugin.Matrix[1][3], command)
+        mock_update_device.assert_called_with(unit, 0, command)
        
         self.plugin.onHeartbeat.assert_called()
 
