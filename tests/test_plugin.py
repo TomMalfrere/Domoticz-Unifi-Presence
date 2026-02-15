@@ -43,13 +43,6 @@ class TestPlugin(TestCase):
         # Provide a Domoticz mock that exposes the methods onStart calls
         self.domoticz = MagicMock()
         
-        unifi_domoticz_plugin.Domoticz = self.domoticz
-        # Ensure Images and Devices dicts exist and use fakeDomoticz ones
-        unifi_domoticz_plugin.Images = fakeDomoticz.Images
-        unifi_domoticz_plugin.Devices = fakeDomoticz.Devices
-        self._orig_update_device = unifi_domoticz_plugin.UpdateDevice
-        unifi_domoticz_plugin.UpdateDevice = fakeDomoticz.UpdateDevice
-
         # Make Domoticz.Image call fakeDomoticz.Image
         self.domoticz.Image.side_effect = lambda zip: fakeDomoticz.Image(zip)
 
@@ -58,6 +51,13 @@ class TestPlugin(TestCase):
         self.domoticz.Debug = MagicMock()
         self.domoticz.Log = MagicMock()
         self.domoticz.Error = MagicMock()
+
+        unifi_domoticz_plugin.Domoticz = self.domoticz
+        # Ensure Images and Devices dicts exist and use fakeDomoticz ones
+        unifi_domoticz_plugin.Images = fakeDomoticz.Images
+        unifi_domoticz_plugin.Devices = fakeDomoticz.Devices
+        self._orig_update_device = unifi_domoticz_plugin.UpdateDevice       # Save original UpdateDevice to restore later
+        unifi_domoticz_plugin.UpdateDevice = fakeDomoticz.UpdateDevice      # Use fake UpdateDevice to avoid side effects during tests
 
         # Create plugin instance and stub out login to avoid network calls
         self.plugin = unifi_domoticz_plugin.BasePlugin()
@@ -81,15 +81,21 @@ class TestPlugin(TestCase):
         self.assertIsInstance(self.plugin, unifi_domoticz_plugin.BasePlugin)
         self.assertEqual(self.plugin._Off_Delay, 60)
         self.assertEqual(self.plugin._log_devices, False)
-        
+    
+    def _mock_devices_for_onStart(self, off_delay: int, update_log: str):
+        self.create_devices = MagicMock()
+        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_OFF_DELAY] = MagicMock()
+        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_OFF_DELAY].nValue = off_delay
+        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_UPDATE_LOG] = MagicMock()
+        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_UPDATE_LOG].sValue = update_log           
+
     def test_onStart(self):
         self.plugin.login = MagicMock()
         self.domoticz.Heartbeat = MagicMock()
-        # onStart checks 2 devices: UNIFI_OFF_DELAY and UNIFI_UPDATE_LOG, so we need to ensure they exist in Devices
-        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_OFF_DELAY] = MagicMock()
-        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_OFF_DELAY].nValue = 10
-        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_UPDATE_LOG] = MagicMock()
-        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_UPDATE_LOG].sValue = "On"
+        # onStart requires 2 devices: UNIFI_OFF_DELAY and UNIFI_UPDATE_LOG
+        # normally these would be created by create_devices() in InitAfterLogin() in login()
+        # but since we're mocking login(), we need to mock them here
+        self._mock_devices_for_onStart(10, "On")
         self.assertEqual(len(unifi_domoticz_plugin.Images), 0)
         self.assertEqual(len(unifi_domoticz_plugin.Devices), 2)
 
@@ -109,10 +115,7 @@ class TestPlugin(TestCase):
         unifi_domoticz_plugin.Parameters["Mode6"] = "20"
         unifi_domoticz_plugin.Images.clear()
         unifi_domoticz_plugin.Devices.clear()
-        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_OFF_DELAY] = MagicMock()
-        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_OFF_DELAY].nValue = 0
-        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_UPDATE_LOG] = MagicMock()
-        unifi_domoticz_plugin.Devices[self.plugin.UNIFI_UPDATE_LOG].sValue = "Off"
+        self._mock_devices_for_onStart(0, "Off")
         self.assertEqual(len(unifi_domoticz_plugin.Images), 0)
         self.assertEqual(len(unifi_domoticz_plugin.Devices), 2)
 
@@ -202,16 +205,26 @@ class TestPlugin(TestCase):
         command = "On"
         level = 50
         hue = 100
-        # current_status_code: 200
+        
+        # Test with current_status_code: None
         self.plugin._current_status_code = None
+        
         self.plugin.onCommand(unit, command, level, hue)
+        
         self.plugin.onHeartbeat.assert_called()
 
         # current_status_code: 200
-        # self.plugin.onHeartbeat.reset_mock()
-        # self.plugin._current_status_code = 200
-        # self.plugin.onCommand(unit, command, level, hue)
-        # self.plugin.onHeartbeat.assert_called()
+        self.plugin.onHeartbeat.reset_mock()
+        
+        # Clear Images and Devices so _onStart_mocked() assertions pass
+        unifi_domoticz_plugin.Images.clear()
+        unifi_domoticz_plugin.Devices.clear()
+        
+        self._onStart_mocked()
+       
+        self.plugin.onCommand(unit, command, level, hue)
+       
+        self.plugin.onHeartbeat.assert_called()
 
 
     def test_onNotification(self):
@@ -642,18 +655,38 @@ class TestPlugin(TestCase):
         self.plugin._session.close.assert_not_called()
         self.assertEqual(self.plugin._current_status_code, 200)
         
+    def _onStart_mocked(self):
+        # self.plugin.login = MagicMock()
+        # self.domoticz.Heartbeat = MagicMock()
+        self.assertEqual(len(unifi_domoticz_plugin.Images), 0)
+        self.assertEqual(len(unifi_domoticz_plugin.Devices), 0)
+
+        # mocks for login()
+        mock_session = MagicMock()
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.cookies = MagicMock()
+        mock_response.headers = {}
+        mock_response.json.return_value = {'data': []}  # For detectUnifiDevices()
+        mock_session.post.return_value = mock_response
+        mock_session.get.return_value = mock_response  # Mock GET request for detectUnifiDevices()
+        with patch('plugin.Session', return_value=mock_session):
+            # call onStart -> login -> InitAfterLogin -> detectUnifiDevices
+            self.plugin.onStart()
+            
     def test_InitAfterLogin(self):
+        
+        unifi_domoticz_plugin.Parameters["Mode2"] = ("Phone1=aa:bb:cc:dd:ee:ff,"
+                                                     "Phone2=11:22:33:44:55:66")
+        
+        # test with _current_status_code None      
+        self.plugin._current_status_code = None
+        
         self.plugin.detectUnifiDevices = MagicMock()
         # self.plugin.create_devices = MagicMock()
         
-        unifi_domoticz_plugin.Parameters["Mode2"] = "Phone1=aa:bb:cc:dd:ee:ff,Phone2=11:22:33:44:55:66"
-        
-        # test with _current_status_code None      
-        self.domoticz.Debug.reset_mock()
-        self.domoticz.Log.reset_mock()
-        self.domoticz.Error.reset_mock()
-        self.plugin._current_status_code = None        
         self.plugin.InitAfterLogin()
+        
         self.plugin.detectUnifiDevices.assert_not_called()
         # self.plugin.create_devices.assert_not_called()
         self.domoticz.Debug.assert_not_called()
@@ -666,48 +699,19 @@ class TestPlugin(TestCase):
         self.domoticz.Error.reset_mock()
 
         self.assertEqual(len(unifi_domoticz_plugin.Images), 0)
-        #self.assertEqual(len(unifi_domoticz_plugin.Devices), 2)
-        
-        # mocks for login()
-        mock_session = MagicMock()
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.cookies = MagicMock()
-        mock_response.headers = {}
-        mock_session.post.return_value = mock_response
-        with patch('plugin.Session', return_value=mock_session):
-            # call onStart -> login -> InitAfterLogin -> create_devices
-            self.plugin.onStart()        
+        self.assertEqual(len(unifi_domoticz_plugin.Devices), 0)
+
+        self._onStart_mocked()        
 
         self.assertEqual(len(unifi_domoticz_plugin.Images), 3)
-        #self.assertEqual(len(unifi_domoticz_plugin.Devices), 5)
+        self.assertEqual(len(unifi_domoticz_plugin.Devices), 9)
 
         self.plugin.detectUnifiDevices.assert_called()
-        # self.plugin.create_devices.assert_called()
         expected = [call("onStart:  called"),
                     call("login: called")]
         self.domoticz.Debug.assert_has_calls(expected, any_order=True)
         self.domoticz.Log.assert_called()
-        self.domoticz.Error.assert_not_called()
-        
-        # self.domoticz.Debug.reset_mock()
-        # self.domoticz.Log.reset_mock()
-        
-        # self.plugin._current_status_code = 200
-        
-        # self.plugin.InitAfterLogin()
-        
-        # self.plugin.detectUnifiDevices.assert_called()
-        # self.plugin.create_devices.assert_called()
-        
-        # self.domoticz.Debug.assert_called_with("InitAfterLogin: called")
-        # self.domoticz.Log.assert_not_called()
-
-    # def test_create_devices(self):
-    #     self.domoticz.Device = MagicMock()
-        
-    #     # Call create_devices
-    #     self.plugin.create_devices()
+        self.domoticz.Error.assert_not_called()       
 
     def test_setVersionCheck(self):
         # Call setVersionCheck
